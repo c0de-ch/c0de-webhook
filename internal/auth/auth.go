@@ -157,7 +157,7 @@ func (a *Auth) CleanupSessions() {
 
 func generateSessionToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	mac := hmac.New(sha256.New, b)
 	mac.Write([]byte("session"))
 	return hex.EncodeToString(mac.Sum(nil))

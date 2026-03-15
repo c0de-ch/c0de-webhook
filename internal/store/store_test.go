@@ -492,7 +492,7 @@ func TestListMessages(t *testing.T) {
 	}
 
 	// Test filter "sent"
-	msgs, total, err = s.ListMessages("sent", 100, 0)
+	_, total, err = s.ListMessages("sent", 100, 0)
 	if err != nil {
 		t.Fatalf("ListMessages(sent) error: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestListMessages(t *testing.T) {
 	}
 
 	// Test filter "failed"
-	msgs, total, err = s.ListMessages("failed", 100, 0)
+	_, total, err = s.ListMessages("failed", 100, 0)
 	if err != nil {
 		t.Fatalf("ListMessages(failed) error: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestListMessages(t *testing.T) {
 	}
 
 	// Test filter "queued"
-	msgs, total, err = s.ListMessages("queued", 100, 0)
+	_, total, err = s.ListMessages("queued", 100, 0)
 	if err != nil {
 		t.Fatalf("ListMessages(queued) error: %v", err)
 	}

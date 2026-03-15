@@ -109,7 +109,7 @@ func main() {
 		w.Stop()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
-		server.Shutdown(shutdownCtx)
+		_ = server.Shutdown(shutdownCtx)
 	}()
 
 	log.Printf("Starting c0de-webhook on %s", addr)

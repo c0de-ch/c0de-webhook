@@ -517,10 +517,6 @@ func newMockSMTPServer(t *testing.T) *mockSMTPServer {
 	return &mockSMTPServer{listener: ln}
 }
 
-func (m *mockSMTPServer) addr() string {
-	return m.listener.Addr().String()
-}
-
 func (m *mockSMTPServer) port() int {
 	return m.listener.Addr().(*net.TCPAddr).Port
 }
