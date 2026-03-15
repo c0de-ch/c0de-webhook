@@ -6,7 +6,7 @@
         <a href="/queue?status=sent" class="filter-link{{if eq .Content.Filter "sent"}} active{{end}}">Sent</a>
         <a href="/queue?status=failed" class="filter-link{{if eq .Content.Filter "failed"}} active{{end}}">Failed</a>
     </div>
-    <div class="filter-total">{{.Content.Total}} messages</div>
+    <div class="filter-total" id="queue-total">{{.Content.Total}} messages</div>
 </section>
 
 <section class="table-section">
@@ -26,9 +26,9 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="queue-body">
                 {{range .Content.Messages}}
-                <tr>
+                <tr id="msg-{{.ID}}">
                     <td class="cell-mono cell-muted">{{.ID}}</td>
                     <td>{{.TokenName}}</td>
                     <td class="cell-mono">{{.To}}</td>
@@ -82,4 +82,55 @@
     {{end}}
 </nav>
 {{end}}
+{{end}}
+
+{{define "page_script"}}
+<script>
+(function() {
+    var filter = '{{.Content.Filter}}';
+    var page = {{.Content.Page}};
+    var url = '/api/live/queue?status=' + filter + '&page=' + page;
+
+    Live.start(url, function(d) {
+        document.getElementById('queue-total').textContent = d.total + ' messages';
+
+        var body = document.getElementById('queue-body');
+        if (!d.messages || d.messages.length === 0) {
+            body.innerHTML = '<tr><td colspan="10" class="empty-row">No messages in queue</td></tr>';
+            return;
+        }
+
+        var rows = '';
+        d.messages.forEach(function(m) {
+            var actions = '';
+            if (m.status === 'failed') {
+                actions += '<form method="POST" action="/queue/' + m.id + '/retry" class="inline-action">'
+                    + '<button type="submit" class="btn btn-small btn-retry">Retry</button></form>';
+            }
+            actions += '<form method="POST" action="/queue/' + m.id + '/delete" class="inline-action" onsubmit="return confirm(\'Delete this message?\')">'
+                + '<button type="submit" class="btn btn-small btn-danger">Delete</button></form>';
+
+            var errorCell = '';
+            if (m.last_error) {
+                errorCell = '<span class="error-text" onclick="this.classList.toggle(\'expanded\')">'
+                    + Live.escape(m.last_error) + '</span>';
+            }
+
+            rows += '<tr id="msg-' + m.id + '">'
+                + '<td class="cell-mono cell-muted">' + m.id + '</td>'
+                + '<td>' + Live.escape(m.token_name) + '</td>'
+                + '<td class="cell-mono">' + Live.escape(m.to) + '</td>'
+                + '<td title="' + Live.escape(m.subject) + '">' + Live.escape(Live.truncate(m.subject, 30)) + '</td>'
+                + '<td style="font-size:0.82rem;">' + Live.escape(m.channel) + '</td>'
+                + '<td>' + Live.statusBadge(m.status) + '</td>'
+                + '<td style="text-align:center;">' + m.attempts + '</td>'
+                + '<td class="cell-muted cell-error">' + errorCell + '</td>'
+                + '<td class="cell-muted cell-tabular">' + m.created_at + '</td>'
+                + '<td class="actions-cell">' + actions + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = rows;
+    }, 3000);
+})();
+</script>
 {{end}}

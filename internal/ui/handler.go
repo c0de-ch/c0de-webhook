@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -117,6 +118,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /settings", h.auth.RequireSession(h.handleSettings))
 	mux.HandleFunc("POST /settings/password", h.auth.RequireSession(h.handleChangePassword))
 	mux.HandleFunc("POST /settings/channels", h.auth.RequireSession(h.handleSaveChannels))
+
+	// Live data JSON endpoints (session-authenticated)
+	mux.HandleFunc("GET /api/live/dashboard", h.auth.RequireSession(h.handleLiveDashboard))
+	mux.HandleFunc("GET /api/live/queue", h.auth.RequireSession(h.handleLiveQueue))
+	mux.HandleFunc("GET /api/live/token/{id}", h.auth.RequireSession(h.handleLiveTokenDetail))
 }
 
 func (h *Handler) loadTemplates(webFS fs.FS) map[string]*template.Template {
@@ -578,4 +584,109 @@ func (h *Handler) handleSaveChannels(w http.ResponseWriter, r *http.Request) {
 		h.onSettingsSaved()
 	}
 	http.Redirect(w, r, "/settings?ch_msg=Channel+settings+saved+and+applied.", http.StatusSeeOther)
+}
+
+// --- Live data JSON endpoints ---
+
+type liveMessage struct {
+	ID        int64  `json:"id"`
+	TokenName string `json:"token_name"`
+	Channel   string `json:"channel"`
+	To        string `json:"to"`
+	Subject   string `json:"subject"`
+	Status    string `json:"status"`
+	Attempts  int    `json:"attempts"`
+	LastError string `json:"last_error"`
+	CreatedAt string `json:"created_at"`
+}
+
+func toLiveMessages(msgs []store.Message) []liveMessage {
+	out := make([]liveMessage, len(msgs))
+	for i, m := range msgs {
+		out[i] = liveMessage{
+			ID:        m.ID,
+			TokenName: m.TokenName,
+			Channel:   m.Channel,
+			To:        m.To,
+			Subject:   m.Subject,
+			Status:    m.Status,
+			Attempts:  m.Attempts,
+			LastError: m.LastError,
+			CreatedAt: m.CreatedAt.Format("2006-01-02 15:04:05"),
+		}
+	}
+	return out
+}
+
+func (h *Handler) handleLiveDashboard(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.store.GetDashboardStats()
+	if err != nil {
+		http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
+		return
+	}
+	recent, _ := h.store.GetRecentMessages(10)
+	tokenStats, _ := h.store.GetTokenStats()
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"stats":        stats,
+		"recent":       toLiveMessages(recent),
+		"token_stats":  tokenStats,
+	})
+}
+
+func (h *Handler) handleLiveQueue(w http.ResponseWriter, r *http.Request) {
+	filter := r.URL.Query().Get("status")
+	if filter == "" {
+		filter = "all"
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	messages, total, err := h.store.ListMessages(filter, 25, (page-1)*25)
+	if err != nil {
+		http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"messages": toLiveMessages(messages),
+		"total":    total,
+		"filter":   filter,
+		"page":     page,
+	})
+}
+
+func (h *Handler) handleLiveTokenDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	messages, total, _ := h.store.GetTokenMessages(id, 25, (page-1)*25)
+	allStats, _ := h.store.GetTokenStats()
+	var stats store.TokenStats
+	for _, ts := range allStats {
+		if ts.TokenID == id {
+			stats = ts
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"stats":    stats,
+		"messages": toLiveMessages(messages),
+		"total":    total,
+		"page":     page,
+	})
 }

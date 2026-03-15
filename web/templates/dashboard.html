@@ -2,19 +2,19 @@
 <section class="stat-cards">
     <div class="stat-card">
         <div class="stat-label">Total Sent</div>
-        <div class="stat-value">{{.Content.Stats.TotalSent}}</div>
+        <div class="stat-value" id="stat-total-sent">{{.Content.Stats.TotalSent}}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Sent Today</div>
-        <div class="stat-value">{{.Content.Stats.TodaySent}}</div>
+        <div class="stat-value" id="stat-today-sent">{{.Content.Stats.TodaySent}}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Success Rate</div>
-        <div class="stat-value">{{printf "%.1f" .Content.Stats.SuccessRate}}%</div>
+        <div class="stat-value" id="stat-success-rate">{{printf "%.1f" .Content.Stats.SuccessRate}}%</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Queue Depth</div>
-        <div class="stat-value">{{.Content.Stats.QueueDepth}}</div>
+        <div class="stat-value" id="stat-queue-depth">{{.Content.Stats.QueueDepth}}</div>
     </div>
 </section>
 
@@ -41,8 +41,7 @@
     </div>
 </section>
 
-{{if .Content.TokenStats}}
-<section class="table-section" style="margin-bottom: 20px;">
+<section class="table-section" style="margin-bottom: 20px;" id="token-stats-section">
     <div class="table-responsive">
         <table class="data-table">
             <thead>
@@ -55,7 +54,7 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="token-stats-body">
                 {{range .Content.TokenStats}}
                 <tr>
                     <td style="font-weight: 600;">{{.TokenName}}</td>
@@ -65,12 +64,13 @@
                     <td style="text-align: right; font-weight: 600;">{{.Total}}</td>
                     <td><a href="/tokens/{{.TokenID}}" style="font-size: 0.85rem;">View</a></td>
                 </tr>
+                {{else}}
+                <tr><td colspan="6" class="empty-row">No tokens with messages</td></tr>
                 {{end}}
             </tbody>
         </table>
     </div>
 </section>
-{{end}}
 
 <section class="table-section">
     <div class="table-responsive">
@@ -85,7 +85,7 @@
                     <th>Time</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="recent-messages-body">
                 {{range .Content.RecentMsgs}}
                 <tr>
                     <td class="cell-mono cell-muted">{{.ID}}</td>
@@ -96,12 +96,58 @@
                     <td class="cell-muted cell-tabular">{{formatTime .CreatedAt}}</td>
                 </tr>
                 {{else}}
-                <tr>
-                    <td colspan="6" class="empty-row">No messages yet</td>
-                </tr>
+                <tr><td colspan="6" class="empty-row">No messages yet</td></tr>
                 {{end}}
             </tbody>
         </table>
     </div>
 </section>
+{{end}}
+
+{{define "page_script"}}
+<script>
+Live.start('/api/live/dashboard', function(d) {
+    // Update stat cards
+    Live.animateValue(document.getElementById('stat-total-sent'), d.stats.TotalSent);
+    Live.animateValue(document.getElementById('stat-today-sent'), d.stats.TodaySent);
+    Live.animateValue(document.getElementById('stat-success-rate'), d.stats.SuccessRate.toFixed(1) + '%');
+    Live.animateValue(document.getElementById('stat-queue-depth'), d.stats.QueueDepth);
+
+    // Update token stats table
+    var tsBody = document.getElementById('token-stats-body');
+    if (d.token_stats && d.token_stats.length > 0) {
+        var rows = '';
+        d.token_stats.forEach(function(t) {
+            rows += '<tr>'
+                + '<td style="font-weight:600;">' + Live.escape(t.TokenName) + '</td>'
+                + '<td style="text-align:right;color:var(--green);">' + t.Sent + '</td>'
+                + '<td style="text-align:right;color:var(--red);">' + t.Failed + '</td>'
+                + '<td style="text-align:right;color:var(--orange);">' + t.Queued + '</td>'
+                + '<td style="text-align:right;font-weight:600;">' + t.Total + '</td>'
+                + '<td><a href="/tokens/' + t.TokenID + '" style="font-size:0.85rem;">View</a></td>'
+                + '</tr>';
+        });
+        tsBody.innerHTML = rows;
+    }
+
+    // Update recent messages table
+    var rmBody = document.getElementById('recent-messages-body');
+    if (d.recent && d.recent.length > 0) {
+        var rows = '';
+        d.recent.forEach(function(m) {
+            rows += '<tr>'
+                + '<td class="cell-mono cell-muted">' + m.id + '</td>'
+                + '<td>' + Live.escape(m.token_name) + '</td>'
+                + '<td class="cell-mono">' + Live.escape(m.to) + '</td>'
+                + '<td title="' + Live.escape(m.subject) + '">' + Live.escape(Live.truncate(m.subject, 30)) + '</td>'
+                + '<td>' + Live.statusBadge(m.status) + '</td>'
+                + '<td class="cell-muted cell-tabular">' + m.created_at + '</td>'
+                + '</tr>';
+        });
+        rmBody.innerHTML = rows;
+    } else if (d.recent && d.recent.length === 0) {
+        rmBody.innerHTML = '<tr><td colspan="6" class="empty-row">No messages yet</td></tr>';
+    }
+}, 3000);
+</script>
 {{end}}

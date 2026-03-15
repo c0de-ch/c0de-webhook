@@ -77,7 +77,49 @@
             document.getElementById('sidebar').classList.add('collapsed');
         }
     })();
+
+    // --- Live update engine ---
+    var Live = {
+        interval: null,
+        start: function(url, callback, ms) {
+            if (this.interval) clearInterval(this.interval);
+            this.poll(url, callback);
+            this.interval = setInterval(function() { Live.poll(url, callback); }, ms || 3000);
+        },
+        poll: function(url, callback) {
+            fetch(url, {credentials:'same-origin'}).then(function(r) {
+                if (r.ok) return r.json();
+                throw new Error(r.status);
+            }).then(callback).catch(function(){});
+        },
+        statusBadge: function(status) {
+            var cls = {sent:'status-sent',failed:'status-failed',queued:'status-queued',sending:'status-sending'};
+            return '<span class="status-badge '+(cls[status]||'')+'">' + status + '</span>';
+        },
+        escape: function(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        },
+        truncate: function(s, n) {
+            if (!s) return '';
+            return s.length > n ? s.substring(0, n) + '...' : s;
+        },
+        animateValue: function(el, newVal) {
+            if (el.textContent !== String(newVal)) {
+                el.textContent = newVal;
+                el.style.transition = 'none';
+                el.style.color = 'var(--orange)';
+                setTimeout(function() {
+                    el.style.transition = 'color 1s ease';
+                    el.style.color = '';
+                }, 50);
+            }
+        }
+    };
     </script>
+    {{block "page_script" .}}{{end}}
 </body>
 </html>
 {{end}}
