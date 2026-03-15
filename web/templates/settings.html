@@ -2,33 +2,6 @@
 {{$s := .Content.Settings}}
 {{$c := .Content.Config}}
 
-<section class="form-section" style="margin-bottom: 20px;">
-    <h2 class="section-title">Change Admin Password</h2>
-    {{if .Content.PasswordMsg}}
-    <div style="padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; font-size: 0.9rem;
-        {{if .Content.PasswordErr}}background: var(--red-bg); color: var(--red); border: 1px solid #e8b4ac;
-        {{else}}background: var(--green-bg); color: var(--green); border: 1px solid #b4d9a6;{{end}}">
-        {{.Content.PasswordMsg}}
-    </div>
-    {{end}}
-    <form method="POST" action="/settings/password">
-        <div class="form-group">
-            <label for="current_password" class="form-label">Current Password</label>
-            <input type="password" id="current_password" name="current_password" class="form-input" required autocomplete="current-password">
-        </div>
-        <div class="form-group">
-            <label for="new_password" class="form-label">New Password</label>
-            <input type="password" id="new_password" name="new_password" class="form-input" required autocomplete="new-password">
-        </div>
-        <div class="form-group">
-            <label for="confirm_password" class="form-label">Confirm New Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required autocomplete="new-password">
-        </div>
-        <button type="submit" class="btn btn-primary">Change Password</button>
-    </form>
-</section>
-
-<form method="POST" action="/settings/channels">
 {{if .Content.SettingsMsg}}
 <div style="padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; font-size: 0.9rem;
     {{if .Content.SettingsErr}}background: var(--red-bg); color: var(--red); border: 1px solid #e8b4ac;
@@ -37,6 +10,32 @@
 </div>
 {{end}}
 
+{{if .Content.PasswordMsg}}
+<div style="padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; font-size: 0.9rem;
+    {{if .Content.PasswordErr}}background: var(--red-bg); color: var(--red); border: 1px solid #e8b4ac;
+    {{else}}background: var(--green-bg); color: var(--green); border: 1px solid #b4d9a6;{{end}}">
+    {{.Content.PasswordMsg}}
+</div>
+{{end}}
+
+<!-- WhatsApp Web — separate from form, has its own buttons -->
+<section class="form-section" style="margin-bottom: 20px;">
+    <h2 class="section-title">WhatsApp Web (Free)</h2>
+    <p style="font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 12px;">
+        Self-hosted via WhatsApp Web protocol. Scan QR code to link your phone. No Meta account needed.
+    </p>
+    <div style="margin-bottom: 12px;">
+        <span style="font-size: 0.9rem; font-weight: 600;">Status: </span>
+        <span id="wa-web-status" style="font-size: 0.9rem;">loading...</span>
+    </div>
+    <div id="wa-web-qr" style="text-align: center; padding: 20px 0; display: none;">
+        <img id="wa-web-qr-img" style="border-radius: 8px; border: 1px solid var(--border); width: 256px; height: 256px;" alt="QR Code">
+        <p style="font-size: 0.85rem; color: var(--fg-muted); margin-top: 8px;">Open WhatsApp &gt; Settings &gt; Linked Devices &gt; Link a Device</p>
+    </div>
+</section>
+
+<!-- Channel settings form -->
+<form method="POST" action="/settings/channels">
 <div class="settings-grid">
     <section class="settings-card">
         <h2 class="settings-card-title">SMTP (Email)</h2>
@@ -83,21 +82,6 @@
                 <option value="login" {{if eq $authMethod "login"}}selected{{end}}>LOGIN (M365)</option>
                 <option value="crammd5" {{if eq $authMethod "crammd5"}}selected{{end}}>CRAM-MD5</option>
             </select>
-        </div>
-    </section>
-
-    <section class="settings-card">
-        <h2 class="settings-card-title">WhatsApp Web (Free)</h2>
-        <p style="font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 12px;">
-            Self-hosted via WhatsApp Web protocol. Scan QR code to link your phone. No Meta account needed.
-        </p>
-        <div style="margin-bottom: 12px;">
-            <span style="font-size: 0.85rem; font-weight: 600;">Status: </span>
-            <span id="wa-web-status" style="font-size: 0.85rem;">loading...</span>
-        </div>
-        <div id="wa-web-qr" style="text-align: center; margin-bottom: 12px; display: none;">
-            <img id="wa-web-qr-img" style="border-radius: 8px; border: 1px solid var(--border);" alt="QR Code">
-            <p style="font-size: 0.82rem; color: var(--fg-muted); margin-top: 6px;">Open WhatsApp > Settings > Linked Devices > Link a Device</p>
         </div>
     </section>
 
@@ -161,6 +145,7 @@
 </div>
 </form>
 
+<!-- API Endpoints reference -->
 <h2 class="section-title" style="margin-top: 32px;">API Endpoints</h2>
 <div class="settings-grid">
     <section class="settings-card">
@@ -180,11 +165,30 @@
         </dl>
     </section>
 </div>
+
+<!-- Password change at the bottom -->
+<section class="form-section" style="margin-top: 32px;">
+    <h2 class="section-title">Change Admin Password</h2>
+    <form method="POST" action="/settings/password">
+        <div class="form-group">
+            <label for="current_password" class="form-label">Current Password</label>
+            <input type="password" id="current_password" name="current_password" class="form-input" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+            <label for="new_password" class="form-label">New Password</label>
+            <input type="password" id="new_password" name="new_password" class="form-input" required autocomplete="new-password">
+        </div>
+        <div class="form-group">
+            <label for="confirm_password" class="form-label">Confirm New Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary">Change Password</button>
+    </form>
+</section>
 {{end}}
 
 {{define "page_script"}}
 <script>
-// WhatsApp Web status polling
 (function() {
     var statusEl = document.getElementById('wa-web-status');
     var qrDiv = document.getElementById('wa-web-qr');
@@ -196,23 +200,30 @@
         .then(function(r) { return r.json(); })
         .then(function(d) {
             var s = d.status;
-            var colors = {connected:'var(--green)', linking:'var(--orange)', disconnected:'var(--red)'};
-            var labels = {
-                connected: '<span style="color:var(--green);">Connected</span> <form method="POST" action="/settings/whatsapp-disconnect" style="display:inline;"><button type="submit" class="btn btn-small btn-danger" style="margin-left:8px;">Disconnect</button></form>',
-                linking: '<span style="color:var(--orange);">Waiting for QR scan...</span>',
-                disconnected: '<span style="color:var(--fg-muted);">Disconnected</span> <form method="POST" action="/settings/whatsapp-link" style="display:inline;"><button type="submit" class="btn btn-small btn-primary" style="margin-left:8px;">Link Device</button></form>',
-                'not configured': '<span style="color:var(--fg-muted);">Not linked</span> <form method="POST" action="/settings/whatsapp-link" style="display:inline;"><button type="submit" class="btn btn-small btn-primary" style="margin-left:8px;">Link Device</button></form>',
-                'not available': '<span style="color:var(--fg-muted);">Not available (requires CGO build)</span>'
-            };
-            statusEl.innerHTML = labels[s] || s;
-
-            // Show QR code if linking
-            if (s === 'linking') {
-                qrImg.src = '/api/live/whatsapp-qr?t=' + Date.now();
-                qrDiv.style.display = 'block';
-            } else {
-                qrDiv.style.display = 'none';
+            var html = '';
+            switch(s) {
+                case 'connected':
+                    html = '<span style="color:var(--green);font-weight:600;">Connected</span>'
+                        + ' <form method="POST" action="/settings/whatsapp-disconnect" style="display:inline;margin-left:8px;">'
+                        + '<button type="submit" class="btn btn-small btn-danger">Disconnect</button></form>';
+                    qrDiv.style.display = 'none';
+                    break;
+                case 'linking':
+                    html = '<span style="color:var(--orange);font-weight:600;">Waiting for QR scan...</span>';
+                    qrImg.src = '/api/live/whatsapp-qr?t=' + Date.now();
+                    qrDiv.style.display = 'block';
+                    break;
+                case 'not available':
+                    html = '<span style="color:var(--fg-muted);">Not available (requires CGO build)</span>';
+                    qrDiv.style.display = 'none';
+                    break;
+                default:
+                    html = '<span style="color:var(--fg-muted);">Not linked</span>'
+                        + ' <form method="POST" action="/settings/whatsapp-link" style="display:inline;margin-left:8px;">'
+                        + '<button type="submit" class="btn btn-small btn-primary">Link Device</button></form>';
+                    qrDiv.style.display = 'none';
             }
+            statusEl.innerHTML = html;
         })
         .catch(function(){});
     }
