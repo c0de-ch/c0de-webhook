@@ -584,7 +584,7 @@ func (s *Store) GetTokenMessages(tokenID int64, limit, offset int) ([]Message, i
 		var m Message
 		var tokenIDn sql.NullInt64
 		var sentAt sql.NullTime
-		if err := rows.Scan(&m.ID, &tokenIDn, &m.TokenName, &m.To, &m.Subject,
+		if err := rows.Scan(&m.ID, &tokenIDn, &m.TokenName, &m.Channel, &m.To, &m.Subject,
 			&m.Status, &m.Attempts, &m.LastError, &m.CreatedAt, &sentAt); err != nil {
 			return nil, 0, err
 		}

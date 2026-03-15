@@ -2312,3 +2312,247 @@ func TestTokensPage_FormatTimeZero(t *testing.T) {
 		t.Error("expected tokens page to show '-' for nil LastUsedAt")
 	}
 }
+
+// --- Test: Token Detail Page ---
+
+func TestTokenDetailPage(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+
+	_, tok, err := st.CreateToken("detail-token")
+	if err != nil {
+		t.Fatalf("creating token: %v", err)
+	}
+
+	// Enqueue some messages with this token
+	for i := 0; i < 3; i++ {
+		_, err := st.EnqueueMessage(&tok.ID, "mail", fmt.Sprintf("detail%d@example.com", i), fmt.Sprintf("Detail %d", i), "body", "", 3)
+		if err != nil {
+			t.Fatalf("enqueuing message %d: %v", i, err)
+		}
+	}
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	path := fmt.Sprintf("/tokens/%d", tok.ID)
+	req := authReq("GET", path, nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	s := string(body)
+	if !strings.Contains(s, "detail-token") {
+		t.Error("expected token detail page to contain the token name 'detail-token'")
+	}
+}
+
+func TestTokenDetailPage_NotFound(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authReq("GET", "/tokens/999", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect for non-existent token, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "/tokens") {
+		t.Errorf("expected redirect to /tokens, got %q", loc)
+	}
+	if !strings.Contains(loc, "not+found") {
+		t.Errorf("expected 'not found' in redirect, got %q", loc)
+	}
+}
+
+// --- Test: Save Channel Settings ---
+
+func TestSaveChannelSettings(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	form := url.Values{
+		"smtp_host":             {"smtp.test.com"},
+		"smtp_port":             {"587"},
+		"smtp_username":         {"testuser"},
+		"smtp_password":         {"testpass"},
+		"smtp_from":             {"test@test.com"},
+		"smtp_tls":              {"true"},
+		"smtp_auth_method":      {"PLAIN"},
+		"whatsapp_phone_id":     {"12345"},
+		"whatsapp_access_token": {"wa-token-abc"},
+		"whatsapp_api_version":  {"v17.0"},
+		"telegram_bot_token":    {"tg-bot-123"},
+		"telegram_parse_mode":   {"HTML"},
+	}
+	req := authFormReq("/settings/channels", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "ch_msg=") {
+		t.Errorf("expected redirect with ch_msg param, got %q", loc)
+	}
+	if !strings.Contains(loc, "saved") {
+		t.Errorf("expected success message containing 'saved', got %q", loc)
+	}
+
+	// Verify settings were actually persisted
+	val, err := st.GetSetting("smtp_host")
+	if err != nil {
+		t.Fatalf("GetSetting(smtp_host) error: %v", err)
+	}
+	if val != "smtp.test.com" {
+		t.Errorf("expected smtp_host='smtp.test.com', got %q", val)
+	}
+
+	val, err = st.GetSetting("whatsapp_phone_id")
+	if err != nil {
+		t.Fatalf("GetSetting(whatsapp_phone_id) error: %v", err)
+	}
+	if val != "12345" {
+		t.Errorf("expected whatsapp_phone_id='12345', got %q", val)
+	}
+
+	val, err = st.GetSetting("telegram_bot_token")
+	if err != nil {
+		t.Fatalf("GetSetting(telegram_bot_token) error: %v", err)
+	}
+	if val != "tg-bot-123" {
+		t.Errorf("expected telegram_bot_token='tg-bot-123', got %q", val)
+	}
+
+	// Verify settings page shows the saved values
+	req = authReq("GET", "/settings", nil, cookie)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	body, _ := io.ReadAll(w.Result().Body)
+	s := string(body)
+	if !strings.Contains(s, "smtp.test.com") {
+		t.Error("expected settings page to contain 'smtp.test.com'")
+	}
+	if !strings.Contains(s, "12345") {
+		t.Error("expected settings page to contain whatsapp_phone_id '12345'")
+	}
+	if !strings.Contains(s, "tg-bot-123") {
+		t.Error("expected settings page to contain telegram_bot_token 'tg-bot-123'")
+	}
+}
+
+// --- Test: Change Password ---
+
+func TestChangePassword_Success(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	form := url.Values{
+		"current_password": {"changeme"},
+		"new_password":     {"newpassword123"},
+		"confirm_password": {"newpassword123"},
+	}
+	req := authFormReq("/settings/password", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "msg=") {
+		t.Errorf("expected redirect with msg param, got %q", loc)
+	}
+	if !strings.Contains(loc, "success") {
+		t.Errorf("expected success message, got %q", loc)
+	}
+	// Verify err=1 is NOT present (not an error)
+	if strings.Contains(loc, "err=1") {
+		t.Errorf("expected no error flag on success, got %q", loc)
+	}
+}
+
+func TestChangePassword_WrongCurrent(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	form := url.Values{
+		"current_password": {"wrongpassword"},
+		"new_password":     {"newpassword123"},
+		"confirm_password": {"newpassword123"},
+	}
+	req := authFormReq("/settings/password", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "err=1") {
+		t.Errorf("expected error flag in redirect, got %q", loc)
+	}
+	if !strings.Contains(loc, "incorrect") {
+		t.Errorf("expected error message about incorrect password, got %q", loc)
+	}
+}
+
+func TestChangePassword_Mismatch(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	form := url.Values{
+		"current_password": {"changeme"},
+		"new_password":     {"newpassword123"},
+		"confirm_password": {"differentpassword"},
+	}
+	req := authFormReq("/settings/password", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "err=1") {
+		t.Errorf("expected error flag in redirect, got %q", loc)
+	}
+	if !strings.Contains(loc, "match") {
+		t.Errorf("expected error message about password mismatch, got %q", loc)
+	}
+}

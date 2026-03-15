@@ -1100,3 +1100,300 @@ func TestHashToken(t *testing.T) {
 		t.Errorf("hash is not valid hex: %v", err)
 	}
 }
+
+func TestGetSetting(t *testing.T) {
+	s := newTestStore(t)
+
+	// Set a setting, then get it back
+	if err := s.SetSetting("smtp_host", "mail.example.com"); err != nil {
+		t.Fatalf("SetSetting error: %v", err)
+	}
+
+	val, err := s.GetSetting("smtp_host")
+	if err != nil {
+		t.Fatalf("GetSetting error: %v", err)
+	}
+	if val != "mail.example.com" {
+		t.Errorf("expected 'mail.example.com', got %q", val)
+	}
+}
+
+func TestGetSetting_NotFound(t *testing.T) {
+	s := newTestStore(t)
+
+	_, err := s.GetSetting("nonexistent_key")
+	if err == nil {
+		t.Fatal("expected error for non-existent key, got nil")
+	}
+}
+
+func TestSetSetting(t *testing.T) {
+	s := newTestStore(t)
+
+	// Set a value
+	if err := s.SetSetting("smtp_port", "25"); err != nil {
+		t.Fatalf("SetSetting error: %v", err)
+	}
+	val, err := s.GetSetting("smtp_port")
+	if err != nil {
+		t.Fatalf("GetSetting error: %v", err)
+	}
+	if val != "25" {
+		t.Errorf("expected '25', got %q", val)
+	}
+
+	// Overwrite with a new value
+	if err := s.SetSetting("smtp_port", "587"); err != nil {
+		t.Fatalf("SetSetting overwrite error: %v", err)
+	}
+	val, err = s.GetSetting("smtp_port")
+	if err != nil {
+		t.Fatalf("GetSetting after overwrite error: %v", err)
+	}
+	if val != "587" {
+		t.Errorf("expected '587' after overwrite, got %q", val)
+	}
+}
+
+func TestSetSetting_Upsert(t *testing.T) {
+	s := newTestStore(t)
+
+	// Set the same key twice and verify only the latest value is stored
+	if err := s.SetSetting("from_addr", "old@example.com"); err != nil {
+		t.Fatalf("first SetSetting error: %v", err)
+	}
+	if err := s.SetSetting("from_addr", "new@example.com"); err != nil {
+		t.Fatalf("second SetSetting error: %v", err)
+	}
+
+	val, err := s.GetSetting("from_addr")
+	if err != nil {
+		t.Fatalf("GetSetting error: %v", err)
+	}
+	if val != "new@example.com" {
+		t.Errorf("expected 'new@example.com', got %q", val)
+	}
+
+	// Verify there is only one row for this key by checking GetAllSettings
+	all, err := s.GetAllSettings()
+	if err != nil {
+		t.Fatalf("GetAllSettings error: %v", err)
+	}
+	count := 0
+	for k := range all {
+		if k == "from_addr" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 entry for 'from_addr', got %d", count)
+	}
+}
+
+func TestGetAllSettings(t *testing.T) {
+	s := newTestStore(t)
+
+	// Set multiple settings
+	settings := map[string]string{
+		"smtp_host":     "smtp.example.com",
+		"smtp_port":     "465",
+		"smtp_username": "user@example.com",
+		"smtp_from":     "noreply@example.com",
+	}
+	for k, v := range settings {
+		if err := s.SetSetting(k, v); err != nil {
+			t.Fatalf("SetSetting(%s) error: %v", k, err)
+		}
+	}
+
+	all, err := s.GetAllSettings()
+	if err != nil {
+		t.Fatalf("GetAllSettings error: %v", err)
+	}
+
+	if len(all) != len(settings) {
+		t.Errorf("expected %d settings, got %d", len(settings), len(all))
+	}
+	for k, expected := range settings {
+		if got, ok := all[k]; !ok {
+			t.Errorf("expected key %q in settings", k)
+		} else if got != expected {
+			t.Errorf("setting %q: expected %q, got %q", k, expected, got)
+		}
+	}
+}
+
+func TestGetAllSettings_Empty(t *testing.T) {
+	s := newTestStore(t)
+
+	all, err := s.GetAllSettings()
+	if err != nil {
+		t.Fatalf("GetAllSettings error: %v", err)
+	}
+	if len(all) != 0 {
+		t.Errorf("expected empty map on fresh store, got %d entries", len(all))
+	}
+}
+
+func TestGetTokenStats(t *testing.T) {
+	s := newTestStore(t)
+
+	// Create two tokens
+	_, tok1, err := s.CreateToken("token-alpha")
+	if err != nil {
+		t.Fatalf("CreateToken(alpha) error: %v", err)
+	}
+	_, tok2, err := s.CreateToken("token-beta")
+	if err != nil {
+		t.Fatalf("CreateToken(beta) error: %v", err)
+	}
+
+	tok1ID := tok1.ID
+	tok2ID := tok2.ID
+
+	// Enqueue messages for token-alpha: 2 messages
+	for i := 0; i < 2; i++ {
+		_, err := s.EnqueueMessage(&tok1ID, "mail", fmt.Sprintf("alpha%d@example.com", i), fmt.Sprintf("Alpha %d", i), "body", "", 1)
+		if err != nil {
+			t.Fatalf("EnqueueMessage(alpha) error: %v", err)
+		}
+	}
+
+	// Enqueue messages for token-beta: 3 messages
+	for i := 0; i < 3; i++ {
+		_, err := s.EnqueueMessage(&tok2ID, "mail", fmt.Sprintf("beta%d@example.com", i), fmt.Sprintf("Beta %d", i), "body", "", 1)
+		if err != nil {
+			t.Fatalf("EnqueueMessage(beta) error: %v", err)
+		}
+	}
+
+	// Send one of alpha's messages and fail one of beta's
+	claimed, err := s.ClaimPendingMessages(5)
+	if err != nil {
+		t.Fatalf("ClaimPendingMessages error: %v", err)
+	}
+
+	// Find an alpha message and mark it sent
+	for _, m := range claimed {
+		if m.TokenID != nil && *m.TokenID == tok1ID {
+			_ = s.MarkSent(m.ID)
+			break
+		}
+	}
+	// Find a beta message and mark it failed
+	for _, m := range claimed {
+		if m.TokenID != nil && *m.TokenID == tok2ID {
+			_ = s.MarkFailed(m.ID, "error", 0) // max_attempts=1 -> goes to failed
+			break
+		}
+	}
+
+	// Reset stuck messages (the rest are in 'sending')
+	_ = s.ResetStuckMessages()
+
+	stats, err := s.GetTokenStats()
+	if err != nil {
+		t.Fatalf("GetTokenStats error: %v", err)
+	}
+	if len(stats) != 2 {
+		t.Fatalf("expected 2 token stats, got %d", len(stats))
+	}
+
+	// Build a lookup by token ID
+	statsByID := make(map[int64]TokenStats)
+	for _, ts := range stats {
+		statsByID[ts.TokenID] = ts
+	}
+
+	alphaStats, ok := statsByID[tok1ID]
+	if !ok {
+		t.Fatal("expected stats for token-alpha")
+	}
+	if alphaStats.TokenName != "token-alpha" {
+		t.Errorf("expected TokenName 'token-alpha', got %q", alphaStats.TokenName)
+	}
+	if alphaStats.Total != 2 {
+		t.Errorf("alpha: expected Total=2, got %d", alphaStats.Total)
+	}
+	if alphaStats.Sent != 1 {
+		t.Errorf("alpha: expected Sent=1, got %d", alphaStats.Sent)
+	}
+
+	betaStats, ok := statsByID[tok2ID]
+	if !ok {
+		t.Fatal("expected stats for token-beta")
+	}
+	if betaStats.Total != 3 {
+		t.Errorf("beta: expected Total=3, got %d", betaStats.Total)
+	}
+	if betaStats.Failed != 1 {
+		t.Errorf("beta: expected Failed=1, got %d", betaStats.Failed)
+	}
+}
+
+func TestGetTokenMessages(t *testing.T) {
+	s := newTestStore(t)
+
+	_, tok, err := s.CreateToken("msg-token")
+	if err != nil {
+		t.Fatalf("CreateToken error: %v", err)
+	}
+	tokenID := tok.ID
+
+	// Enqueue 5 messages for this token
+	for i := 0; i < 5; i++ {
+		_, err := s.EnqueueMessage(&tokenID, "mail", fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Subject %d", i), "text", "", 3)
+		if err != nil {
+			t.Fatalf("EnqueueMessage error: %v", err)
+		}
+	}
+
+	// Also enqueue a message without a token to verify filtering
+	_, err = s.EnqueueMessage(nil, "mail", "other@example.com", "Other", "text", "", 3)
+	if err != nil {
+		t.Fatalf("EnqueueMessage(nil token) error: %v", err)
+	}
+
+	// Get all messages for the token
+	msgs, total, err := s.GetTokenMessages(tokenID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetTokenMessages error: %v", err)
+	}
+	if total != 5 {
+		t.Errorf("expected total=5, got %d", total)
+	}
+	if len(msgs) != 5 {
+		t.Errorf("expected 5 messages, got %d", len(msgs))
+	}
+
+	// Verify all returned messages belong to the token
+	for i, m := range msgs {
+		if m.TokenID == nil || *m.TokenID != tokenID {
+			t.Errorf("msg[%d]: expected TokenID=%d, got %v", i, tokenID, m.TokenID)
+		}
+	}
+
+	// Test pagination: get first 2
+	msgs, total, err = s.GetTokenMessages(tokenID, 2, 0)
+	if err != nil {
+		t.Fatalf("GetTokenMessages(limit=2) error: %v", err)
+	}
+	if total != 5 {
+		t.Errorf("expected total=5 with pagination, got %d", total)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 messages with limit=2, got %d", len(msgs))
+	}
+
+	// Test pagination: get with offset
+	msgs, total, err = s.GetTokenMessages(tokenID, 2, 3)
+	if err != nil {
+		t.Fatalf("GetTokenMessages(limit=2,offset=3) error: %v", err)
+	}
+	if total != 5 {
+		t.Errorf("expected total=5, got %d", total)
+	}
+	if len(msgs) != 2 {
+		t.Errorf("expected 2 messages with limit=2 offset=3, got %d", len(msgs))
+	}
+}

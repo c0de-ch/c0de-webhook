@@ -14,6 +14,7 @@ import (
 type Sender struct {
 	BotToken  string
 	ParseMode string // "HTML", "Markdown", or "" for plain text
+	BaseURL   string // override for testing; defaults to "https://api.telegram.org"
 	client    *http.Client
 }
 
@@ -31,7 +32,11 @@ func (s *Sender) Send(chatID, text string) error {
 		return fmt.Errorf("telegram bot token not configured")
 	}
 
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.BotToken)
+	base := s.BaseURL
+	if base == "" {
+		base = "https://api.telegram.org"
+	}
+	url := fmt.Sprintf("%s/bot%s/sendMessage", base, s.BotToken)
 
 	payload := map[string]interface{}{
 		"chat_id": chatID,

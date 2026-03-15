@@ -19,6 +19,7 @@ type BusinessSender struct {
 	PhoneNumberID string
 	AccessToken   string
 	APIVersion    string // e.g. "v21.0"
+	BaseURL       string // override for testing; defaults to "https://graph.facebook.com"
 	client        *http.Client
 }
 
@@ -41,7 +42,11 @@ func (s *BusinessSender) Send(phone, text string) error {
 		return fmt.Errorf("whatsapp business API not configured")
 	}
 
-	url := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", s.APIVersion, s.PhoneNumberID)
+	base := s.BaseURL
+	if base == "" {
+		base = "https://graph.facebook.com"
+	}
+	url := fmt.Sprintf("%s/%s/%s/messages", base, s.APIVersion, s.PhoneNumberID)
 
 	payload := map[string]interface{}{
 		"messaging_product": "whatsapp",

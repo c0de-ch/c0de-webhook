@@ -353,3 +353,241 @@ func TestRouteRegistration(t *testing.T) {
 		t.Error("GET /api/v1/send should not return a success status")
 	}
 }
+
+// --- WhatsApp v2 endpoint tests ---
+
+func TestHandleWhatsAppSend_Success(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"phone":"+1234567890","text":"Hello via WhatsApp"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/whatsapp", body, rawToken)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp SendResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.ID == 0 {
+		t.Error("expected non-zero message ID")
+	}
+	if resp.Status != "queued" {
+		t.Errorf("expected status 'queued', got %q", resp.Status)
+	}
+	if resp.Channel != "whatsapp" {
+		t.Errorf("expected channel 'whatsapp', got %q", resp.Channel)
+	}
+}
+
+func TestHandleWhatsAppSend_MissingPhone(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"text":"Hello via WhatsApp"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/whatsapp", body, rawToken)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "\"phone\" is required") {
+		t.Errorf("expected error to mention '\"phone\" is required', got %q", resp.Error)
+	}
+}
+
+func TestHandleWhatsAppSend_MissingText(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"phone":"+1234567890"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/whatsapp", body, rawToken)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "\"text\" is required") {
+		t.Errorf("expected error to mention '\"text\" is required', got %q", resp.Error)
+	}
+}
+
+func TestHandleWhatsAppSend_NoAuth(t *testing.T) {
+	_, _, h, _ := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"phone":"+1234567890","text":"Hello via WhatsApp"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/whatsapp", body, "")
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+// --- Telegram v2 endpoint tests ---
+
+func TestHandleTelegramSend_Success(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"chat_id":"123456789","text":"Hello via Telegram"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/telegram", body, rawToken)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp SendResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.ID == 0 {
+		t.Error("expected non-zero message ID")
+	}
+	if resp.Status != "queued" {
+		t.Errorf("expected status 'queued', got %q", resp.Status)
+	}
+	if resp.Channel != "telegram" {
+		t.Errorf("expected channel 'telegram', got %q", resp.Channel)
+	}
+}
+
+func TestHandleTelegramSend_MissingChatID(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"text":"Hello via Telegram"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/telegram", body, rawToken)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "\"chat_id\" is required") {
+		t.Errorf("expected error to mention '\"chat_id\" is required', got %q", resp.Error)
+	}
+}
+
+func TestHandleTelegramSend_MissingText(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"chat_id":"123456789"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/telegram", body, rawToken)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp.Error, "\"text\" is required") {
+		t.Errorf("expected error to mention '\"text\" is required', got %q", resp.Error)
+	}
+}
+
+// --- v2 mail endpoint test ---
+
+func TestHandleV2MailSend_Success(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	body := `{"to":"user@example.com","subject":"V2 Mail","text":"Hello from v2"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/mail", body, rawToken)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp SendResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.ID == 0 {
+		t.Error("expected non-zero message ID")
+	}
+	if resp.Status != "queued" {
+		t.Errorf("expected status 'queued', got %q", resp.Status)
+	}
+	if resp.Channel != "mail" {
+		t.Errorf("expected channel 'mail', got %q", resp.Channel)
+	}
+}
+
+// --- v2 route registration test ---
+
+func TestV2RouteRegistration(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	// Verify POST /api/v2/mail is registered
+	mailBody := `{"to":"user@example.com","subject":"Test","text":"body"}`
+	rr := sendRequest(t, mux, "POST", "/api/v2/mail", mailBody, rawToken)
+	if rr.Code == http.StatusNotFound || rr.Code == http.StatusMethodNotAllowed {
+		t.Errorf("POST /api/v2/mail should be registered, got status %d", rr.Code)
+	}
+
+	// Verify POST /api/v2/whatsapp is registered
+	waBody := `{"phone":"+1234567890","text":"test"}`
+	rr2 := sendRequest(t, mux, "POST", "/api/v2/whatsapp", waBody, rawToken)
+	if rr2.Code == http.StatusNotFound || rr2.Code == http.StatusMethodNotAllowed {
+		t.Errorf("POST /api/v2/whatsapp should be registered, got status %d", rr2.Code)
+	}
+
+	// Verify POST /api/v2/telegram is registered
+	tgBody := `{"chat_id":"123","text":"test"}`
+	rr3 := sendRequest(t, mux, "POST", "/api/v2/telegram", tgBody, rawToken)
+	if rr3.Code == http.StatusNotFound || rr3.Code == http.StatusMethodNotAllowed {
+		t.Errorf("POST /api/v2/telegram should be registered, got status %d", rr3.Code)
+	}
+
+	// Verify GET /api/v2/health is registered
+	req := httptest.NewRequest("GET", "/api/v2/health", nil)
+	rr4 := httptest.NewRecorder()
+	mux.ServeHTTP(rr4, req)
+	if rr4.Code == http.StatusNotFound || rr4.Code == http.StatusMethodNotAllowed {
+		t.Errorf("GET /api/v2/health should be registered, got status %d", rr4.Code)
+	}
+}
