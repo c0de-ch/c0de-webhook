@@ -678,11 +678,11 @@ func TestGetDashboardStats(t *testing.T) {
 
 	// Claim all, send 2, fail 1, leave 2 as sending then reset to queued
 	claimed, _ := s.ClaimPendingMessages(5)
-	s.MarkSent(claimed[0].ID)
-	s.MarkSent(claimed[1].ID)
-	s.MarkFailed(claimed[2].ID, "err", 0) // max_attempts=1, so goes to failed
+	_ = s.MarkSent(claimed[0].ID)
+	_ = s.MarkSent(claimed[1].ID)
+	_ = s.MarkFailed(claimed[2].ID, "err", 0) // max_attempts=1, so goes to failed
 	// Reset the remaining 'sending' messages back to queued
-	s.ResetStuckMessages()
+	_ = s.ResetStuckMessages()
 
 	stats, err := s.GetDashboardStats()
 	if err != nil {
@@ -722,7 +722,7 @@ func TestGetHourlyStats(t *testing.T) {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
 	_, _ = s.ClaimPendingMessages(1)
-	s.MarkSent(msg.ID)
+	_ = s.MarkSent(msg.ID)
 
 	stats, err := s.GetHourlyStats(24)
 	if err != nil {
@@ -808,7 +808,7 @@ func TestGetRecentMessages_WithTokenAndSentAt(t *testing.T) {
 
 	// Claim and mark sent to populate sent_at
 	_, _ = s.ClaimPendingMessages(1)
-	s.MarkSent(msg.ID)
+	_ = s.MarkSent(msg.ID)
 
 	msgs, err := s.GetRecentMessages(10)
 	if err != nil {
@@ -876,7 +876,7 @@ func TestListMessages_WithTokenName(t *testing.T) {
 	}
 
 	_, _ = s.ClaimPendingMessages(1)
-	s.MarkSent(msg.ID)
+	_ = s.MarkSent(msg.ID)
 
 	msgs, total, err := s.ListMessages("sent", 10, 0)
 	if err != nil {
@@ -909,7 +909,7 @@ func TestGetHourlyStats_WithFailed(t *testing.T) {
 	}
 
 	_, _ = s.ClaimPendingMessages(1)
-	s.MarkFailed(msg.ID, "err", 0) // max_attempts=1, goes to failed
+	_ = s.MarkFailed(msg.ID, "err", 0) // max_attempts=1, goes to failed
 
 	stats, err := s.GetHourlyStats(24)
 	if err != nil {
@@ -1002,11 +1002,11 @@ func TestListMessages_AllStatuses(t *testing.T) {
 
 	m1, _ := s.EnqueueMessage(nil, "a@b.com", "S1", "t", "", 3)
 	m2, _ := s.EnqueueMessage(nil, "a@b.com", "S2", "t", "", 3)
-	s.EnqueueMessage(nil, "a@b.com", "S3", "t", "", 3)
+	_, _ = s.EnqueueMessage(nil, "a@b.com", "S3", "t", "", 3)
 
-	s.ClaimPendingMessages(3)
-	s.MarkSent(m1.ID)
-	s.MarkFailed(m2.ID, "err", time.Second)
+	_, _ = s.ClaimPendingMessages(3)
+	_ = s.MarkSent(m1.ID)
+	_ = s.MarkFailed(m2.ID, "err", time.Second)
 
 	all, total, _ := s.ListMessages("all", 10, 0)
 	if total != 3 {
@@ -1035,7 +1035,7 @@ func TestMarkFailed_ExceedsMaxRetries(t *testing.T) {
 
 	// max_attempts=1: first failure should mark it failed
 	msg, _ := s.EnqueueMessage(nil, "x@y.com", "Sub", "t", "", 1)
-	s.ClaimPendingMessages(1)
+	_, _ = s.ClaimPendingMessages(1)
 
 	err := s.MarkFailed(msg.ID, "boom", time.Second)
 	if err != nil {
