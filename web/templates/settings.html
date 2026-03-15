@@ -1,0 +1,107 @@
+{{define "content"}}
+<section class="form-section" style="margin-bottom: 20px;">
+    <h2 class="section-title">Change Admin Password</h2>
+    {{if .Content.PasswordMsg}}
+    <div style="padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; font-size: 0.9rem;
+        {{if .Content.PasswordErr}}background: var(--red-bg); color: var(--red); border: 1px solid #e8b4ac;
+        {{else}}background: var(--green-bg); color: var(--green); border: 1px solid #b4d9a6;{{end}}">
+        {{.Content.PasswordMsg}}
+    </div>
+    {{end}}
+    <form method="POST" action="/settings/password">
+        <div class="form-group">
+            <label for="current_password" class="form-label">Current Password</label>
+            <input type="password" id="current_password" name="current_password" class="form-input" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+            <label for="new_password" class="form-label">New Password</label>
+            <input type="password" id="new_password" name="new_password" class="form-input" required autocomplete="new-password">
+        </div>
+        <div class="form-group">
+            <label for="confirm_password" class="form-label">Confirm New Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary">Change Password</button>
+    </form>
+</section>
+
+<div class="settings-grid">
+    <section class="settings-card">
+        <h2 class="settings-card-title">Server</h2>
+        <dl class="settings-list">
+            <div class="settings-item">
+                <dt>Host</dt>
+                <dd>{{.Content.Config.Server.Host}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Port</dt>
+                <dd>{{.Content.Config.Server.Port}}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="settings-card">
+        <h2 class="settings-card-title">SMTP</h2>
+        <dl class="settings-list">
+            <div class="settings-item">
+                <dt>Host</dt>
+                <dd>{{.Content.Config.SMTP.Host}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Port</dt>
+                <dd>{{.Content.Config.SMTP.Port}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Username</dt>
+                <dd>{{.Content.Config.SMTP.Username}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Password</dt>
+                <dd>{{maskPassword .Content.Config.SMTP.Password}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>From</dt>
+                <dd>{{.Content.Config.SMTP.From}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>TLS</dt>
+                <dd>{{if .Content.Config.SMTP.TLS}}Enabled{{else}}Disabled{{end}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Auth Method</dt>
+                <dd>{{.Content.Config.SMTP.AuthMethod}}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="settings-card">
+        <h2 class="settings-card-title">Queue</h2>
+        <dl class="settings-list">
+            <div class="settings-item">
+                <dt>Workers</dt>
+                <dd>{{.Content.Config.Queue.Workers}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Max Retries</dt>
+                <dd>{{.Content.Config.Queue.MaxRetries}}</dd>
+            </div>
+            <div class="settings-item">
+                <dt>Retry Delay</dt>
+                <dd>{{.Content.Config.Queue.RetryDelay}}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="settings-card">
+        <h2 class="settings-card-title">Database</h2>
+        <dl class="settings-list">
+            <div class="settings-item">
+                <dt>Path</dt>
+                <dd>{{.Content.Config.Database.Path}}</dd>
+            </div>
+        </dl>
+    </section>
+</div>
+
+<p class="settings-note">Other settings are managed via config file. Restart the server after changes.</p>
+{{end}}

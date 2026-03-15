@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: c0de-webhook
+  labels:
+    app: c0de-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: c0de-webhook
+  template:
+    metadata:
+      labels:
+        app: c0de-webhook
+    spec:
+      containers:
+        - name: c0de-webhook
+          image: ghcr.io/c0de-ch/c0de-webhook:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/c0de-webhook
+              readOnly: true
+            - name: data
+              mountPath: /data
+          env:
+            - name: WEBHOOK_DB_PATH
+              value: "/data/webhook.db"
+            - name: WEBHOOK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: c0de-webhook-secret
+                  key: admin-password
+            - name: WEBHOOK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: c0de-webhook-secret
+                  key: secret-key
+            - name: WEBHOOK_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: c0de-webhook-secret
+                  key: smtp-password
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: c0de-webhook-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: c0de-webhook-data

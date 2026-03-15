@@ -1,0 +1,107 @@
+{{define "content"}}
+<section class="stat-cards">
+    <div class="stat-card">
+        <div class="stat-label">Total Sent</div>
+        <div class="stat-value">{{.Content.Stats.TotalSent}}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Sent Today</div>
+        <div class="stat-value">{{.Content.Stats.TodaySent}}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value">{{printf "%.1f" .Content.Stats.SuccessRate}}%</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Queue Depth</div>
+        <div class="stat-value">{{.Content.Stats.QueueDepth}}</div>
+    </div>
+</section>
+
+<section class="chart-section">
+    <h2 class="section-title">Hourly Activity</h2>
+    <div class="bar-chart">
+        {{range .Content.HourlyStats}}
+        <div class="bar-column">
+            <div class="bar-stack" style="height: {{barHeight .Total $.Content.MaxHourly}}%;">
+                {{if .Failed}}
+                <div class="bar-segment bar-failed" style="height: {{barHeight .Failed $.Content.MaxHourly}}%;"></div>
+                {{end}}
+                {{if .Sent}}
+                <div class="bar-segment bar-sent" style="height: {{barHeight .Sent $.Content.MaxHourly}}%;"></div>
+                {{end}}
+            </div>
+            <div class="bar-label">{{formatHour .Hour}}</div>
+        </div>
+        {{end}}
+    </div>
+    <div class="chart-legend">
+        <span class="legend-item"><span class="legend-color legend-sent"></span> Sent</span>
+        <span class="legend-item"><span class="legend-color legend-failed"></span> Failed</span>
+    </div>
+</section>
+
+{{if .Content.TokenStats}}
+<section class="table-section" style="margin-bottom: 20px;">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>API Token</th>
+                    <th style="text-align: right;">Sent</th>
+                    <th style="text-align: right;">Failed</th>
+                    <th style="text-align: right;">Queued</th>
+                    <th style="text-align: right;">Total</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Content.TokenStats}}
+                <tr>
+                    <td style="font-weight: 600;">{{.TokenName}}</td>
+                    <td style="text-align: right; color: var(--green);">{{.Sent}}</td>
+                    <td style="text-align: right; color: var(--red);">{{.Failed}}</td>
+                    <td style="text-align: right; color: var(--orange);">{{.Queued}}</td>
+                    <td style="text-align: right; font-weight: 600;">{{.Total}}</td>
+                    <td><a href="/tokens/{{.TokenID}}" style="font-size: 0.85rem;">View</a></td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</section>
+{{end}}
+
+<section class="table-section">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Token</th>
+                    <th>To</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Content.RecentMsgs}}
+                <tr>
+                    <td class="cell-mono cell-muted">{{.ID}}</td>
+                    <td>{{.TokenName}}</td>
+                    <td class="cell-mono">{{.To}}</td>
+                    <td title="{{.Subject}}">{{truncate .Subject 30}}</td>
+                    <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
+                    <td class="cell-muted cell-tabular">{{formatTime .CreatedAt}}</td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="6" class="empty-row">No messages yet</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</section>
+{{end}}

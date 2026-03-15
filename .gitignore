@@ -1,0 +1,10 @@
+c0de-webhook
+data/
+*.db
+*.db-wal
+*.db-shm
+coverage.out
+coverage.html
+.env
+config.yaml
+dist/

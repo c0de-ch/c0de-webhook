@@ -1,0 +1,79 @@
+{{define "content"}}
+{{if .Content.NewToken}}
+<div class="token-reveal">
+    <div class="token-reveal-title">Token created successfully</div>
+    <div class="token-reveal-note">Copy this token now. It will not be shown again.</div>
+    <div class="token-reveal-value">
+        <code id="new-token">{{.Content.NewToken}}</code>
+        <button type="button" class="btn btn-small btn-copy" onclick="copyToken()">Copy</button>
+    </div>
+</div>
+<script>
+function copyToken() {
+    var token = document.getElementById('new-token').textContent;
+    navigator.clipboard.writeText(token).then(function() {
+        var btn = document.querySelector('.btn-copy');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+    });
+}
+</script>
+{{end}}
+
+<section class="form-section">
+    <h2 class="section-title">Create Token</h2>
+    <form method="POST" action="/tokens" class="inline-form">
+        <div class="form-group">
+            <label for="name" class="form-label">Token Name</label>
+            <input type="text" id="name" name="name" class="form-input" required placeholder="e.g. my-app-production">
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </form>
+</section>
+
+<section class="table-section">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Content.Tokens}}
+                <tr>
+                    <td style="font-weight: 500;"><a href="/tokens/{{.ID}}">{{.Name}}</a></td>
+                    <td style="font-variant-numeric: tabular-nums; color: var(--fg-muted);">{{formatTime .CreatedAt}}</td>
+                    <td style="font-variant-numeric: tabular-nums; color: var(--fg-muted);">{{formatTimePtr .LastUsedAt}}</td>
+                    <td>
+                        {{if .IsActive}}
+                        <span class="status-badge status-active">Active</span>
+                        {{else}}
+                        <span class="status-badge status-disabled">Disabled</span>
+                        {{end}}
+                    </td>
+                    <td class="actions-cell">
+                        <form method="POST" action="/tokens/{{.ID}}/toggle" class="inline-action">
+                            <button type="submit" class="btn btn-small btn-toggle">
+                                {{if .IsActive}}Disable{{else}}Enable{{end}}
+                            </button>
+                        </form>
+                        <form method="POST" action="/tokens/{{.ID}}/delete" class="inline-action" onsubmit="return confirm('Delete this token? This cannot be undone.');">
+                            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="5" class="empty-row">No tokens created yet</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</section>
+{{end}}

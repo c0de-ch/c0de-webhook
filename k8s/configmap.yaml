@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c0de-webhook-config
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+
+    smtp:
+      host: "smtp.example.com"
+      port: 587
+      username: "user@example.com"
+      from: "noreply@example.com"
+      tls: true
+      auth_method: "plain"
+
+    queue:
+      workers: 2
+      max_retries: 3
+      retry_delay: "30s"
+
+    database:
+      path: "/data/webhook.db"

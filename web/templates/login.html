@@ -1,0 +1,29 @@
+{{define "login"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — c0de-webhook</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <h1 class="login-title">c0de-webhook</h1>
+            <p class="login-subtitle">Enter your admin password to continue</p>
+            {{if .Flash}}
+            <div class="login-error">{{.Flash}}</div>
+            {{end}}
+            <form method="POST" action="/login" class="login-form">
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" required autofocus placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}

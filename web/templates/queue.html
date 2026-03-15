@@ -1,0 +1,83 @@
+{{define "content"}}
+<section class="filter-bar">
+    <div class="filter-links">
+        <a href="/queue?status=all" class="filter-link{{if eq .Content.Filter "all"}} active{{end}}">All</a>
+        <a href="/queue?status=queued" class="filter-link{{if eq .Content.Filter "queued"}} active{{end}}">Queued</a>
+        <a href="/queue?status=sent" class="filter-link{{if eq .Content.Filter "sent"}} active{{end}}">Sent</a>
+        <a href="/queue?status=failed" class="filter-link{{if eq .Content.Filter "failed"}} active{{end}}">Failed</a>
+    </div>
+    <div class="filter-total">{{.Content.Total}} messages</div>
+</section>
+
+<section class="table-section">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Token</th>
+                    <th>To</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                    <th>Attempts</th>
+                    <th>Error</th>
+                    <th>Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Content.Messages}}
+                <tr>
+                    <td class="cell-mono cell-muted">{{.ID}}</td>
+                    <td>{{.TokenName}}</td>
+                    <td class="cell-mono">{{.To}}</td>
+                    <td title="{{.Subject}}">{{truncate .Subject 30}}</td>
+                    <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
+                    <td style="text-align: center;">{{.Attempts}}</td>
+                    <td title="{{.LastError}}" class="cell-muted" style="font-size: 0.85rem;">{{truncate .LastError 40}}</td>
+                    <td class="cell-muted cell-tabular">{{formatTime .CreatedAt}}</td>
+                    <td class="actions-cell">
+                        {{if eq .Status "failed"}}
+                        <form method="POST" action="/queue/{{.ID}}/retry" class="inline-action">
+                            <button type="submit" class="btn btn-small btn-retry">Retry</button>
+                        </form>
+                        {{end}}
+                        <form method="POST" action="/queue/{{.ID}}/delete" class="inline-action" onsubmit="return confirm('Delete this message?');">
+                            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="9" class="empty-row">No messages in queue</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{{if gt .Content.Pages 1}}
+<nav class="pagination">
+    {{$currentPage := .Content.Page}}
+    {{$totalPages := .Content.Pages}}
+    {{$filter := .Content.Filter}}
+
+    {{if gt $currentPage 1}}
+    <a href="/queue?status={{$filter}}&page={{sub $currentPage 1}}" class="pagination-link pagination-prev">Previous</a>
+    {{else}}
+    <span class="pagination-link pagination-prev disabled">Previous</span>
+    {{end}}
+
+    {{range $p := seq $totalPages}}
+    <a href="/queue?status={{$filter}}&page={{$p}}" class="pagination-link{{if eq $p $currentPage}} active{{end}}">{{$p}}</a>
+    {{end}}
+
+    {{if lt $currentPage $totalPages}}
+    <a href="/queue?status={{$filter}}&page={{add $currentPage 1}}" class="pagination-link pagination-next">Next</a>
+    {{else}}
+    <span class="pagination-link pagination-next disabled">Next</span>
+    {{end}}
+</nav>
+{{end}}
+{{end}}

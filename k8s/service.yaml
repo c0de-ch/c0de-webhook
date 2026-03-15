@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: c0de-webhook
+  labels:
+    app: c0de-webhook
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: c0de-webhook

@@ -1,0 +1,22 @@
+server:
+  host: "0.0.0.0"
+  port: 8090
+  admin_password: "changeme"
+  secret_key: "change-this-to-a-random-string"
+
+smtp:
+  host: "smtp.example.com"
+  port: 587
+  username: ""
+  password: ""
+  from: "noreply@example.com"
+  tls: true
+  auth_method: "plain"  # plain, login, crammd5, none
+
+queue:
+  workers: 2
+  max_retries: 3
+  retry_delay: "30s"
+
+database:
+  path: "./data/webhook.db"

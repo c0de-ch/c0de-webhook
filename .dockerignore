@@ -1,0 +1,9 @@
+data/
+*.db
+.git
+.gitignore
+.idea
+*.md
+!README.md
+dist/
+coverage.*
