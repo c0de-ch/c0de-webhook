@@ -540,7 +540,7 @@ func (m *mockSMTPServer) serve(t *testing.T) {
 	m.mu.Unlock()
 
 	// Set a deadline so the test doesn't hang.
-	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	reader := bufio.NewReader(conn)
 	write := func(s string) {
@@ -761,7 +761,7 @@ func TestConnect_STARTTLS_Failure(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 		reader := bufio.NewReader(conn)
 		fmt.Fprintf(conn, "220 localhost ESMTP\r\n")
@@ -870,7 +870,7 @@ func TestConnect_PlainNoTLS(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 		reader := bufio.NewReader(conn)
 		fmt.Fprintf(conn, "220 localhost ESMTP\r\n")
 		for {
@@ -903,7 +903,7 @@ func TestConnect_PlainNoTLS(t *testing.T) {
 		t.Fatalf("connect() failed: %v", err)
 	}
 	defer client.Close()
-	client.Quit()
+	_ = client.Quit()
 }
 
 // ---------------------------------------------------------------------------

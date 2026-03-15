@@ -469,15 +469,15 @@ func TestListMessages(t *testing.T) {
 	// Mark messages 1, 2 as sent
 	claimed, _ := s.ClaimPendingMessages(5)
 	for i := 0; i < 2; i++ {
-		s.MarkSent(claimed[i].ID)
+		_ = s.MarkSent(claimed[i].ID)
 	}
 	// Mark message 3 as failed (max_attempts=3, fail 3 times)
 	for j := 0; j < 3; j++ {
-		s.MarkFailed(claimed[2].ID, "err", 0)
+		_ = s.MarkFailed(claimed[2].ID, "err", 0)
 	}
 	// Messages 4, 5 remain in 'sending' status (since they were claimed)
 	// Reset them back to queued for a clean test
-	s.ResetStuckMessages()
+	_ = s.ResetStuckMessages()
 
 	// Test filter "all"
 	msgs, total, err := s.ListMessages("all", 100, 0)

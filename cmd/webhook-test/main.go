@@ -107,12 +107,12 @@ func main() {
 
 		if resp.StatusCode == http.StatusAccepted {
 			var sr SendResponse
-			json.Unmarshal(respBody, &sr)
+			_ = json.Unmarshal(respBody, &sr)
 			fmt.Printf("[%d/%d] OK  id=%d status=%s  to=%s subject=%q\n", i, *count, sr.ID, sr.Status, *to, subj)
 			sent++
 		} else {
 			var er ErrorResponse
-			json.Unmarshal(respBody, &er)
+			_ = json.Unmarshal(respBody, &er)
 			fmt.Fprintf(os.Stderr, "[%d/%d] FAIL  http=%d error=%q\n", i, *count, resp.StatusCode, er.Error)
 			failed++
 		}

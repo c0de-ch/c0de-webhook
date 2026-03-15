@@ -252,7 +252,7 @@ func (s *Store) ClaimPendingMessages(limit int) ([]Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// First, find the IDs to claim
 	rows, err := tx.Query(`
