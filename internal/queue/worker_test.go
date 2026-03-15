@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"c0de-webhook/internal/store"
+	"c0de-webhook/internal/telegram"
+	"c0de-webhook/internal/whatsapp"
 )
 
 // --- mock senders ---
@@ -720,4 +725,172 @@ func (f *failThenCloseSender) Send(_, _, _, _ string) error {
 	f.mu.Unlock()
 	_ = f.store.Close()
 	return f.sendErr
+}
+
+// --- channel-routing tests ---
+
+func TestSendByChannel_WhatsApp(t *testing.T) {
+	// Use a real BusinessSender pointing at a test HTTP server that returns 200.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"messages":[{"id":"test"}]}`))
+	}))
+	defer srv.Close()
+
+	wa := whatsapp.NewBusinessSender("123456", "test-token", "v21.0")
+	wa.BaseURL = srv.URL
+
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	w := NewWorker(st, ChannelSender{WhatsApp: wa}, 1, 10*time.Millisecond)
+
+	msg := store.Message{
+		ID:       1,
+		Channel:  "whatsapp",
+		To:       "41791234567",
+		TextBody: "hello via whatsapp",
+	}
+
+	err := w.sendByChannel(msg)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestSendByChannel_Telegram(t *testing.T) {
+	// Use a real telegram.Sender pointing at a test HTTP server that returns 200.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	tg := telegram.NewSender("bot-token-123", "")
+	tg.BaseURL = srv.URL
+
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	w := NewWorker(st, ChannelSender{Telegram: tg}, 1, 10*time.Millisecond)
+
+	msg := store.Message{
+		ID:       1,
+		Channel:  "telegram",
+		To:       "123456789",
+		TextBody: "hello via telegram",
+	}
+
+	err := w.sendByChannel(msg)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestSendByChannel_UnknownChannel(t *testing.T) {
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	ms := &mockSender{}
+	w := NewWorker(st, mockChannelSender(ms), 1, 10*time.Millisecond)
+
+	msg := store.Message{
+		ID:       1,
+		Channel:  "sms",
+		To:       "+1234567890",
+		TextBody: "hello sms",
+	}
+
+	err := w.sendByChannel(msg)
+	if err == nil {
+		t.Fatal("expected error for unknown channel, got nil")
+	}
+	if err.Error() != "unknown channel: sms" {
+		t.Errorf("expected 'unknown channel: sms', got %q", err.Error())
+	}
+}
+
+func TestSendByChannel_WhatsAppNotConfigured(t *testing.T) {
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	// No WhatsApp or WhatsAppWeb senders configured (both nil).
+	w := NewWorker(st, ChannelSender{Mail: &mockSender{}}, 1, 10*time.Millisecond)
+
+	msg := store.Message{
+		ID:       1,
+		Channel:  "whatsapp",
+		To:       "41791234567",
+		TextBody: "hello",
+	}
+
+	err := w.sendByChannel(msg)
+	if err == nil {
+		t.Fatal("expected error when WhatsApp is not configured, got nil")
+	}
+	if !strings.Contains(err.Error(), "whatsapp not configured") {
+		t.Errorf("expected error containing 'whatsapp not configured', got %q", err.Error())
+	}
+}
+
+func TestSendByChannel_TelegramNotConfigured(t *testing.T) {
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	// Telegram sender is nil.
+	w := NewWorker(st, ChannelSender{Mail: &mockSender{}}, 1, 10*time.Millisecond)
+
+	msg := store.Message{
+		ID:       1,
+		Channel:  "telegram",
+		To:       "123456789",
+		TextBody: "hello",
+	}
+
+	err := w.sendByChannel(msg)
+	if err == nil {
+		t.Fatal("expected error when Telegram is not configured, got nil")
+	}
+	if !strings.Contains(err.Error(), "telegram sender not configured") {
+		t.Errorf("expected error containing 'telegram sender not configured', got %q", err.Error())
+	}
+}
+
+func TestUpdateSenders(t *testing.T) {
+	st := newTestStore(t)
+	defer func() { _ = st.Close() }()
+
+	ms1 := &mockSender{}
+	w := NewWorker(st, mockChannelSender(ms1), 1, 10*time.Millisecond)
+
+	// Verify initial sender.
+	if w.senders.Mail != ms1 {
+		t.Fatal("initial mail sender mismatch")
+	}
+
+	// Create a new set of senders and hot-swap.
+	ms2 := &mockSender{}
+	tg := telegram.NewSender("new-bot-token", "HTML")
+	wa := whatsapp.NewBusinessSender("new-phone-id", "new-access-token", "v21.0")
+
+	newSenders := ChannelSender{
+		Mail:     ms2,
+		Telegram: tg,
+		WhatsApp: wa,
+	}
+	w.UpdateSenders(newSenders)
+
+	// Verify all senders were swapped.
+	w.sendersMu.RLock()
+	defer w.sendersMu.RUnlock()
+
+	if w.senders.Mail != ms2 {
+		t.Error("mail sender was not updated")
+	}
+	if w.senders.Telegram != tg {
+		t.Error("telegram sender was not updated")
+	}
+	if w.senders.WhatsApp != wa {
+		t.Error("whatsapp sender was not updated")
+	}
 }

@@ -22,14 +22,20 @@ jobs:
           version: latest
 
       - name: Test
-        run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./internal/...
+        run: |
+          CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic \
+            ./internal/config/ ./internal/store/ ./internal/auth/ \
+            ./internal/mail/ ./internal/queue/ ./internal/webhook/ \
+            ./internal/ui/ ./internal/telegram/
+          # Test whatsapp package separately (whatsmeow/web.go is not unit-testable)
+          CGO_ENABLED=1 go test -race ./internal/whatsapp/
 
       - name: Check coverage
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "$COVERAGE < 70" | bc)" -eq 1 ]; then
-            echo "::error::Coverage ${COVERAGE}% is below 70% threshold"
+          if [ "$(echo "$COVERAGE < 80" | bc)" -eq 1 ]; then
+            echo "::error::Coverage ${COVERAGE}% is below 80% threshold"
             exit 1
           fi
 

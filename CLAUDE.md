@@ -88,7 +88,7 @@ Browser (cookie session)             → Web UI (dashboard, tokens, queue, setti
 
 ## Testing
 
-Coverage target: 70%+ on `./internal/...` (CI gate). Queue tests use polling (2s dispatcher interval) so they take ~30s. Use `-timeout 120s` for the queue package. whatsapp/web.go has low coverage because whatsmeow requires a real WhatsApp connection.
+Coverage target: 80%+ on testable packages (CI gate). whatsapp/web.go (whatsmeow) is excluded from coverage measurement since it requires a real WhatsApp connection. Queue tests use polling (2s dispatcher interval) so they take ~30s. Use `-timeout 120s` for the queue package. whatsapp/web.go has low coverage because whatsmeow requires a real WhatsApp connection.
 
 ## Lint
 
@@ -104,7 +104,7 @@ YAML config file + environment variable overrides (WEBHOOK_* prefix) + admin UI 
 ## CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
-- `ci.yaml` — Go 1.25, golangci-lint v7, CGO_ENABLED=1, test + coverage gate (70%) + build
+- `ci.yaml` — Go 1.25, golangci-lint v7, CGO_ENABLED=1, test + coverage gate (80%) + build
 - `release.yaml` — CGO build for linux/amd64+arm64, Docker multi-arch image to ghcr.io on tag `v*`
 
 Docker image: `ghcr.io/c0de-ch/c0de-webhook`

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -501,5 +503,76 @@ func TestClearSessionCookie_NoCookie(t *testing.T) {
 	}
 	if found.MaxAge != -1 {
 		t.Errorf("expected MaxAge -1, got %d", found.MaxAge)
+	}
+}
+
+func TestChangePassword_Success(t *testing.T) {
+	a, _ := newTestAuth(t)
+
+	// Change password from the config password ("test123") to "newpass456".
+	if err := a.ChangePassword("test123", "newpass456"); err != nil {
+		t.Fatalf("ChangePassword failed: %v", err)
+	}
+
+	// Login with the new password should succeed.
+	token, ok := a.Login("newpass456")
+	if !ok {
+		t.Error("expected login with new password to succeed")
+	}
+	if token == "" {
+		t.Error("expected non-empty session token")
+	}
+
+	// Login with the old config password should now fail
+	// (DB hash takes precedence over config password).
+	_, ok = a.Login("test123")
+	if ok {
+		t.Error("expected login with old config password to fail after password change")
+	}
+}
+
+func TestChangePassword_WrongCurrent(t *testing.T) {
+	a, _ := newTestAuth(t)
+
+	err := a.ChangePassword("wrongpassword", "newpass456")
+	if err == nil {
+		t.Fatal("expected error when current password is wrong, got nil")
+	}
+	if err != ErrWrongPassword {
+		t.Errorf("expected ErrWrongPassword, got %v", err)
+	}
+
+	// Verify that the password was not changed — original still works.
+	_, ok := a.Login("test123")
+	if !ok {
+		t.Error("original password should still work after failed change attempt")
+	}
+}
+
+func TestCheckPassword_FromDB(t *testing.T) {
+	a, s := newTestAuth(t)
+
+	// Store a password hash directly in the DB settings.
+	dbPassword := "db-stored-password"
+	h := sha256.Sum256([]byte(dbPassword))
+	hashHex := hex.EncodeToString(h[:])
+	if err := s.SetSetting("admin_password_hash", hashHex); err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+
+	// checkPassword should use the DB hash and accept the DB password.
+	if !a.checkPassword(dbPassword) {
+		t.Error("expected checkPassword to accept the DB-stored password")
+	}
+
+	// The config password ("test123") should now be ignored because
+	// the DB hash takes precedence.
+	if a.checkPassword("test123") {
+		t.Error("expected checkPassword to reject the config password when DB hash is set")
+	}
+
+	// A random wrong password should also fail.
+	if a.checkPassword("totally-wrong") {
+		t.Error("expected checkPassword to reject a wrong password")
 	}
 }

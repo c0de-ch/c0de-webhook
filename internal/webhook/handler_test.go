@@ -591,3 +591,43 @@ func TestV2RouteRegistration(t *testing.T) {
 		t.Errorf("GET /api/v2/health should be registered, got status %d", rr4.Code)
 	}
 }
+
+func TestHandleWhatsAppSend_InvalidJSON(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	rr := sendRequest(t, mux, "POST", "/api/v2/whatsapp", `not json`, rawToken)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestHandleTelegramSend_InvalidJSON(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	rr := sendRequest(t, mux, "POST", "/api/v2/telegram", `not json`, rawToken)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestHandleTelegramSend_NoAuth(t *testing.T) {
+	_, _, h, _ := setupTest(t)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	rr := sendRequest(t, mux, "POST", "/api/v2/telegram", `{"chat_id":"123","text":"hi"}`, "")
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestHandleV2MailSend_InvalidJSON(t *testing.T) {
+	_, _, h, rawToken := setupTest(t)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	rr := sendRequest(t, mux, "POST", "/api/v2/mail", `{broken`, rawToken)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rr.Code)
+	}
+}

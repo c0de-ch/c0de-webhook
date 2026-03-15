@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -2555,4 +2556,397 @@ func TestChangePassword_Mismatch(t *testing.T) {
 	if !strings.Contains(loc, "match") {
 		t.Errorf("expected error message about password mismatch, got %q", loc)
 	}
+}
+
+// --- Test: Live Dashboard ---
+
+func TestLiveDashboard(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authReq("GET", "/api/live/dashboard", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("failed to parse JSON response: %v", err)
+	}
+
+	for _, key := range []string{"stats", "recent", "token_stats"} {
+		if _, ok := data[key]; !ok {
+			t.Errorf("expected JSON key %q in response, got keys: %v", key, keys(data))
+		}
+	}
+}
+
+// --- Test: Live Dashboard Unauthenticated ---
+
+func TestLiveDashboard_Unauthenticated(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+
+	req := httptest.NewRequest("GET", "/api/live/dashboard", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if loc != "/login" {
+		t.Errorf("expected redirect to /login, got %q", loc)
+	}
+}
+
+// --- Test: Live Queue ---
+
+func TestLiveQueue(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	// Enqueue some messages
+	for i := 0; i < 3; i++ {
+		_, err := st.EnqueueMessage(nil, "email", fmt.Sprintf("user%d@example.com", i), "Test Subject", "body", "", 3)
+		if err != nil {
+			t.Fatalf("enqueueing message %d: %v", i, err)
+		}
+	}
+
+	req := authReq("GET", "/api/live/queue?status=all", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("failed to parse JSON response: %v", err)
+	}
+
+	for _, key := range []string{"messages", "total"} {
+		if _, ok := data[key]; !ok {
+			t.Errorf("expected JSON key %q in response, got keys: %v", key, keys(data))
+		}
+	}
+
+	total, ok := data["total"].(float64)
+	if !ok || total < 3 {
+		t.Errorf("expected total >= 3, got %v", data["total"])
+	}
+}
+
+// --- Test: Live Queue With Filter ---
+
+func TestLiveQueue_WithFilter(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	_, err := st.EnqueueMessage(nil, "email", "user@example.com", "Test", "body", "", 3)
+	if err != nil {
+		t.Fatalf("enqueueing message: %v", err)
+	}
+
+	req := authReq("GET", "/api/live/queue?status=queued", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("failed to parse JSON response: %v", err)
+	}
+
+	if filter, ok := data["filter"].(string); !ok || filter != "queued" {
+		t.Errorf("expected filter 'queued', got %v", data["filter"])
+	}
+}
+
+// --- Test: Live Token Detail ---
+
+func TestLiveTokenDetail(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	// Create a token
+	_, tok, err := st.CreateToken("test-token")
+	if err != nil {
+		t.Fatalf("creating token: %v", err)
+	}
+
+	// Enqueue messages for this token
+	tokenID := tok.ID
+	for i := 0; i < 2; i++ {
+		_, err := st.EnqueueMessage(&tokenID, "email", fmt.Sprintf("user%d@example.com", i), "Subject", "body", "", 3)
+		if err != nil {
+			t.Fatalf("enqueueing message %d: %v", i, err)
+		}
+	}
+
+	req := authReq("GET", fmt.Sprintf("/api/live/token/%d", tok.ID), nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("failed to parse JSON response: %v", err)
+	}
+
+	for _, key := range []string{"stats", "messages"} {
+		if _, ok := data[key]; !ok {
+			t.Errorf("expected JSON key %q in response, got keys: %v", key, keys(data))
+		}
+	}
+}
+
+// --- Test: WhatsApp Status ---
+
+func TestWhatsAppStatus(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authReq("GET", "/api/live/whatsapp-status", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]string
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("failed to parse JSON response: %v", err)
+	}
+
+	if data["status"] != "not available" {
+		t.Errorf("expected status 'not available', got %q", data["status"])
+	}
+}
+
+// --- Test: WhatsApp QR Not Available ---
+
+func TestWhatsAppQR_NotAvailable(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authReq("GET", "/api/live/whatsapp-qr", nil, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", resp.StatusCode)
+	}
+}
+
+// --- Test: WhatsApp Link Not Available ---
+
+func TestWhatsAppLink_NotAvailable(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authFormReq("/settings/whatsapp-link", url.Values{}, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "ch_err=1") {
+		t.Errorf("expected redirect with ch_err=1, got %q", loc)
+	}
+	if !strings.Contains(loc, "not+initialized") {
+		t.Errorf("expected error about not initialized, got %q", loc)
+	}
+}
+
+// --- Test: WhatsApp Disconnect ---
+
+func TestWhatsAppDisconnect(t *testing.T) {
+	_, _, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	req := authFormReq("/settings/whatsapp-disconnect", url.Values{}, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "ch_msg=") {
+		t.Errorf("expected redirect with ch_msg, got %q", loc)
+	}
+	if !strings.Contains(loc, "disconnected") {
+		t.Errorf("expected message about disconnected, got %q", loc)
+	}
+}
+
+// --- Test: Save Channel Settings All Fields ---
+
+func TestSaveChannelSettings_AllFields(t *testing.T) {
+	_, _, st, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	form := url.Values{
+		"smtp_host":              {"mail.example.com"},
+		"smtp_port":              {"587"},
+		"smtp_username":          {"user@example.com"},
+		"smtp_password":          {"secret123"},
+		"smtp_from":              {"noreply@example.com"},
+		"smtp_tls":               {"starttls"},
+		"smtp_tls_skip_verify":   {"true"},
+		"smtp_auth_method":       {"plain"},
+		"whatsapp_phone_id":      {"123456789"},
+		"whatsapp_access_token":  {"wa-token-abc"},
+		"whatsapp_api_version":   {"v17.0"},
+		"telegram_bot_token":     {"bot123:ABC-DEF"},
+		"telegram_parse_mode":    {"HTML"},
+	}
+
+	req := authFormReq("/settings/channels", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "ch_msg=") {
+		t.Errorf("expected redirect with ch_msg, got %q", loc)
+	}
+
+	// Verify settings are persisted in the database
+	settings, err := st.GetAllSettings()
+	if err != nil {
+		t.Fatalf("getting settings: %v", err)
+	}
+
+	expected := map[string]string{
+		"smtp_host":              "mail.example.com",
+		"smtp_port":              "587",
+		"smtp_username":          "user@example.com",
+		"smtp_password":          "secret123",
+		"smtp_from":              "noreply@example.com",
+		"smtp_tls":               "starttls",
+		"smtp_tls_skip_verify":   "true",
+		"smtp_auth_method":       "plain",
+		"whatsapp_phone_id":      "123456789",
+		"whatsapp_access_token":  "wa-token-abc",
+		"whatsapp_api_version":   "v17.0",
+		"telegram_bot_token":     "bot123:ABC-DEF",
+		"telegram_parse_mode":    "HTML",
+	}
+	for key, want := range expected {
+		got, ok := settings[key]
+		if !ok {
+			t.Errorf("expected setting %q to be persisted, but not found", key)
+			continue
+		}
+		if got != want {
+			t.Errorf("setting %q: expected %q, got %q", key, want, got)
+		}
+	}
+}
+
+// --- Test: Change Password Via DB ---
+
+func TestChangePassword_ViaDB(t *testing.T) {
+	_, a, _, mux := setupTest(t)
+	cookie := loginSession(t, mux, "changeme")
+	if cookie == nil {
+		t.Fatal("expected session cookie after login")
+	}
+
+	// Change the password via the settings endpoint
+	form := url.Values{
+		"current_password": {"changeme"},
+		"new_password":     {"newSecurePass!"},
+		"confirm_password": {"newSecurePass!"},
+	}
+	req := authFormReq("/settings/password", form, cookie)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect, got %d", resp.StatusCode)
+	}
+	loc := resp.Header.Get("Location")
+	if !strings.Contains(loc, "Password+changed") {
+		t.Errorf("expected success message, got %q", loc)
+	}
+
+	// Verify login with new password succeeds
+	if _, ok := a.Login("newSecurePass!"); !ok {
+		t.Error("expected login with new password to succeed")
+	}
+
+	// Verify login with old password fails
+	if _, ok := a.Login("changeme"); ok {
+		t.Error("expected login with old password to fail")
+	}
+}
+
+// keys returns the key names from a map for diagnostic output.
+func keys(m map[string]interface{}) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
 }
