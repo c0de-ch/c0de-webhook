@@ -15,6 +15,7 @@ import (
 	"c0de-webhook/internal/auth"
 	"c0de-webhook/internal/config"
 	"c0de-webhook/internal/store"
+	"c0de-webhook/internal/whatsapp"
 )
 
 // OnSettingsSaved is called after channel settings are saved in the UI.
@@ -30,6 +31,7 @@ type Handler struct {
 	pendingTokens    map[string]string // sessionID -> raw token
 	mu               sync.Mutex
 	onSettingsSaved  OnSettingsSaved
+	waWeb            *whatsapp.WebClient
 }
 
 type PageData struct {
@@ -78,18 +80,21 @@ type SettingsContent struct {
 	SettingsErr  bool
 }
 
-func NewHandler(st *store.Store, a *auth.Auth, cfg *config.Config, webFS fs.FS, onSaved ...OnSettingsSaved) *Handler {
-	var cb OnSettingsSaved
-	if len(onSaved) > 0 {
-		cb = onSaved[0]
-	}
+type HandlerOption func(*Handler)
+
+func WithOnSettingsSaved(cb OnSettingsSaved) HandlerOption { return func(h *Handler) { h.onSettingsSaved = cb } }
+func WithWhatsAppWeb(wc *whatsapp.WebClient) HandlerOption { return func(h *Handler) { h.waWeb = wc } }
+
+func NewHandler(st *store.Store, a *auth.Auth, cfg *config.Config, webFS fs.FS, opts ...HandlerOption) *Handler {
 	h := &Handler{
-		store:           st,
-		auth:            a,
-		config:          cfg,
-		onSettingsSaved: cb,
+		store:         st,
+		auth:          a,
+		config:        cfg,
 		webFS:         webFS,
 		pendingTokens: make(map[string]string),
+	}
+	for _, opt := range opts {
+		opt(h)
 	}
 	h.templates = h.loadTemplates(webFS)
 	return h
@@ -123,6 +128,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/live/dashboard", h.auth.RequireSession(h.handleLiveDashboard))
 	mux.HandleFunc("GET /api/live/queue", h.auth.RequireSession(h.handleLiveQueue))
 	mux.HandleFunc("GET /api/live/token/{id}", h.auth.RequireSession(h.handleLiveTokenDetail))
+
+	// WhatsApp Web management
+	mux.HandleFunc("GET /api/live/whatsapp-status", h.auth.RequireSession(h.handleWhatsAppStatus))
+	mux.HandleFunc("GET /api/live/whatsapp-qr", h.auth.RequireSession(h.handleWhatsAppQR))
+	mux.HandleFunc("POST /settings/whatsapp-link", h.auth.RequireSession(h.handleWhatsAppLink))
+	mux.HandleFunc("POST /settings/whatsapp-disconnect", h.auth.RequireSession(h.handleWhatsAppDisconnect))
 }
 
 func (h *Handler) loadTemplates(webFS fs.FS) map[string]*template.Template {
@@ -689,4 +700,56 @@ func (h *Handler) handleLiveTokenDetail(w http.ResponseWriter, r *http.Request) 
 		"total":    total,
 		"page":     page,
 	})
+}
+
+// --- WhatsApp Web handlers ---
+
+func (h *Handler) handleWhatsAppStatus(w http.ResponseWriter, r *http.Request) {
+	status := "not available"
+	if h.waWeb != nil {
+		status = h.waWeb.Status()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": status})
+}
+
+func (h *Handler) handleWhatsAppQR(w http.ResponseWriter, r *http.Request) {
+	if h.waWeb == nil {
+		http.Error(w, "WhatsApp Web not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	png := h.waWeb.GetQRPNG()
+	if png == nil {
+		http.Error(w, "No QR code available", http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(png)
+}
+
+func (h *Handler) handleWhatsAppLink(w http.ResponseWriter, r *http.Request) {
+	if h.waWeb == nil {
+		http.Redirect(w, r, "/settings?ch_err=1&ch_msg=WhatsApp+Web+not+initialized", http.StatusSeeOther)
+		return
+	}
+	if err := h.waWeb.StartLinking(); err != nil {
+		log.Printf("ERROR starting WhatsApp linking: %v", err)
+		http.Redirect(w, r, "/settings?ch_err=1&ch_msg=Failed+to+start+linking:+"+err.Error(), http.StatusSeeOther)
+		return
+	}
+	if h.onSettingsSaved != nil {
+		h.onSettingsSaved()
+	}
+	http.Redirect(w, r, "/settings?ch_msg=Scan+the+QR+code+with+WhatsApp+on+your+phone", http.StatusSeeOther)
+}
+
+func (h *Handler) handleWhatsAppDisconnect(w http.ResponseWriter, r *http.Request) {
+	if h.waWeb != nil {
+		h.waWeb.Disconnect()
+		if h.onSettingsSaved != nil {
+			h.onSettingsSaved()
+		}
+	}
+	http.Redirect(w, r, "/settings?ch_msg=WhatsApp+Web+disconnected", http.StatusSeeOther)
 }

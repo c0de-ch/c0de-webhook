@@ -16,9 +16,10 @@ import (
 // ChannelSender provides Send methods for each channel type.
 // Nil senders are allowed — messages for unconfigured channels will fail gracefully.
 type ChannelSender struct {
-	Mail     mail.Sender
-	WhatsApp *whatsapp.BusinessSender
-	Telegram *telegram.Sender
+	Mail        mail.Sender
+	WhatsApp    *whatsapp.BusinessSender
+	WhatsAppWeb *whatsapp.WebClient
+	Telegram    *telegram.Sender
 }
 
 type Worker struct {
@@ -132,10 +133,14 @@ func (w *Worker) sendByChannel(msg store.Message) error {
 
 	switch msg.Channel {
 	case "whatsapp":
-		if senders.WhatsApp == nil || !senders.WhatsApp.Configured() {
-			return fmt.Errorf("whatsapp sender not configured")
+		// Try WhatsApp Web (free) first, fall back to Business API (paid)
+		if senders.WhatsAppWeb != nil && senders.WhatsAppWeb.IsConnected() {
+			return senders.WhatsAppWeb.Send(msg.To, msg.TextBody)
 		}
-		return senders.WhatsApp.Send(msg.To, msg.TextBody)
+		if senders.WhatsApp != nil && senders.WhatsApp.Configured() {
+			return senders.WhatsApp.Send(msg.To, msg.TextBody)
+		}
+		return fmt.Errorf("whatsapp not configured (neither Web nor Business API)")
 	case "telegram":
 		if senders.Telegram == nil || !senders.Telegram.Configured() {
 			return fmt.Errorf("telegram sender not configured")

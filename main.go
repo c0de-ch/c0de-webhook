@@ -50,8 +50,18 @@ func main() {
 
 	a := auth.New(st, cfg.Server.AdminPassword, cfg.Server.SecretKey)
 
+	// Initialize WhatsApp Web client (self-hosted, free)
+	var waWebClient *whatsapp.WebClient
+	waWebClient, err = whatsapp.NewWebClient("./data/whatsapp.db")
+	if err != nil {
+		log.Printf("WARNING: WhatsApp Web init failed (CGO required): %v", err)
+	}
+
 	// Build channel senders — load config from DB settings with config file fallback
 	senders := buildSenders(st, cfg)
+	if waWebClient != nil {
+		senders.WhatsAppWeb = waWebClient
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -79,9 +89,17 @@ func main() {
 		log.Fatalf("Failed to setup web filesystem: %v", err)
 	}
 	reloadSenders := func() {
-		w.UpdateSenders(buildSenders(st, cfg))
+		s := buildSenders(st, cfg)
+		if waWebClient != nil {
+			s.WhatsAppWeb = waWebClient
+		}
+		w.UpdateSenders(s)
 	}
-	uiHandler := ui.NewHandler(st, a, cfg, webFS, reloadSenders)
+	uiOpts := []ui.HandlerOption{ui.WithOnSettingsSaved(reloadSenders)}
+	if waWebClient != nil {
+		uiOpts = append(uiOpts, ui.WithWhatsAppWeb(waWebClient))
+	}
+	uiHandler := ui.NewHandler(st, a, cfg, webFS, uiOpts...)
 	uiHandler.RegisterRoutes(mux)
 
 	webhookHandler := webhook.NewHandler(st, a, cfg.Queue.MaxRetries)
