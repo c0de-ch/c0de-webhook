@@ -17,7 +17,7 @@ func setupTest(t *testing.T) (*store.Store, *auth.Auth, *Handler, string) {
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	t.Cleanup(func() { st.Close() })
+	t.Cleanup(func() { _ = st.Close() })
 
 	a := auth.New(st, "admin", "secret")
 	h := NewHandler(st, a, 3)

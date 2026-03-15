@@ -1,31 +1,25 @@
 version: "2"
 
 linters:
-  enable:
-    - errcheck
-    - govet
-    - staticcheck
-    - gosimple
-    - ineffassign
-    - unused
+  default: standard
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (net.Listener).Close
+        - (*net.TCPListener).Close
+        - fmt.Fprintf
+        - fmt.Fprintln
+      check-type-assertions: false
 
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (io.Closer).Close
-      - (*database/sql.DB).Close
-      - (*database/sql.Rows).Close
-      - (net.Listener).Close
-      - (*net.TCPListener).Close
-      - fmt.Fprintf
-      - fmt.Fprintln
-    check-type-assertions: false
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF*"
+        - "-ST1000"
 
-  staticcheck:
-    checks:
-      - "all"
-      - "-QF*"
-
-  govet:
-    disable:
-      - hostport
+    govet:
+      disable:
+        - hostport

@@ -46,7 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
 	a := auth.New(st, cfg.Server.AdminPassword, cfg.Server.SecretKey)
 

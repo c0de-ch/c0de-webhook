@@ -22,7 +22,7 @@ func setupTest(t *testing.T) (*Handler, *auth.Auth, *store.Store, *http.ServeMux
 	if err != nil {
 		t.Fatalf("creating store: %v", err)
 	}
-	t.Cleanup(func() { st.Close() })
+	t.Cleanup(func() { _ = st.Close() })
 
 	cfg := config.Default()
 	a := auth.New(st, cfg.Server.AdminPassword, cfg.Server.SecretKey)
@@ -1734,7 +1734,7 @@ func TestSettingsPage_WithSMTPPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating store: %v", err)
 	}
-	t.Cleanup(func() { st.Close() })
+	t.Cleanup(func() { _ = st.Close() })
 
 	cfg := config.Default()
 	cfg.SMTP.Password = "supersecret"
@@ -2071,7 +2071,7 @@ func closedStoreSetup(t *testing.T) (*Handler, *auth.Auth, *http.ServeMux) {
 	h.RegisterRoutes(mux)
 
 	// Close the store to force database errors
-	st.Close()
+	_ = st.Close()
 
 	return h, a, mux
 }
