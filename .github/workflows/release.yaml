@@ -20,13 +20,18 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
+
+      - name: Install cross-compilation tools
+        if: matrix.goarch == 'arm64'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "0"
+          CGO_ENABLED: "1"
+          CC: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-gcc' || 'gcc' }}
         run: |
           go build -ldflags="-s -w" -o c0de-webhook-${{ matrix.goos }}-${{ matrix.goarch }} .
           sha256sum c0de-webhook-${{ matrix.goos }}-${{ matrix.goarch }} > c0de-webhook-${{ matrix.goos }}-${{ matrix.goarch }}.sha256
