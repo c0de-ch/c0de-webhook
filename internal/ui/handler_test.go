@@ -624,7 +624,7 @@ func TestQueuePage_WithFilter(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	// Create some messages with different statuses
-	_, err := st.EnqueueMessage(nil, "sent@example.com", "Sent message", "body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","sent@example.com", "Sent message", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -633,7 +633,7 @@ func TestQueuePage_WithFilter(t *testing.T) {
 		t.Fatalf("marking sent: %v", err)
 	}
 
-	_, err = st.EnqueueMessage(nil, "queued@example.com", "Queued message", "body", "", 3)
+	_, err = st.EnqueueMessage(nil, "mail","queued@example.com", "Queued message", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -667,7 +667,7 @@ func TestQueuePage_WithFilter(t *testing.T) {
 func TestQueuePage_WithMessages(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	_, err := st.EnqueueMessage(nil, "user@example.com", "Test subject", "text body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","user@example.com", "Test subject", "text body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -701,7 +701,7 @@ func TestQueuePage_WithMessages(t *testing.T) {
 func TestRetryMessage(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, err := st.EnqueueMessage(nil, "test@example.com", "Subject", "body", "", 3)
+	msg, err := st.EnqueueMessage(nil, "mail","test@example.com", "Subject", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -761,7 +761,7 @@ func TestRetryMessage_InvalidID(t *testing.T) {
 func TestDeleteMessage(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, err := st.EnqueueMessage(nil, "test@example.com", "Subject", "body", "", 3)
+	msg, err := st.EnqueueMessage(nil, "mail","test@example.com", "Subject", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -1008,13 +1008,13 @@ func TestDashboard_WithMessages(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	// Create some messages to populate dashboard stats
-	msg1, _ := st.EnqueueMessage(nil, "a@example.com", "Msg 1", "body", "", 3)
+	msg1, _ := st.EnqueueMessage(nil, "mail","a@example.com", "Msg 1", "body", "", 3)
 	_ = st.MarkSent(msg1.ID)
 
-	msg2, _ := st.EnqueueMessage(nil, "b@example.com", "Msg 2", "body", "", 3)
+	msg2, _ := st.EnqueueMessage(nil, "mail","b@example.com", "Msg 2", "body", "", 3)
 	_ = st.MarkSent(msg2.ID)
 
-	_, _ = st.EnqueueMessage(nil, "c@example.com", "Msg 3", "body", "", 3)
+	_, _ = st.EnqueueMessage(nil, "mail","c@example.com", "Msg 3", "body", "", 3)
 
 	cookie := loginSession(t, mux, "changeme")
 	if cookie == nil {
@@ -1225,7 +1225,7 @@ func TestCreateMultipleTokens(t *testing.T) {
 func TestRetryMessage_RequeuesMessage(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, _ := st.EnqueueMessage(nil, "retry@example.com", "Retry me", "body", "", 3)
+	msg, _ := st.EnqueueMessage(nil, "mail","retry@example.com", "Retry me", "body", "", 3)
 
 	// We need to claim and fail it to put it in "failed" state
 	// First claim to set it to "sending"
@@ -1391,7 +1391,7 @@ func TestDeleteToken_WithMessages(t *testing.T) {
 	}
 
 	// Enqueue a message associated with this token
-	_, err = st.EnqueueMessage(&tok.ID, "test@example.com", "Linked", "body", "", 3)
+	_, err = st.EnqueueMessage(&tok.ID, "mail", "test@example.com", "Linked", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -1432,7 +1432,7 @@ func TestDashboard_HourlyStats(t *testing.T) {
 
 	// Create messages so they appear in hourly stats (created_at within last 24h).
 	for i := 0; i < 5; i++ {
-		msg, err := st.EnqueueMessage(nil, fmt.Sprintf("hourly%d@example.com", i), "Hourly test", "body", "", 3)
+		msg, err := st.EnqueueMessage(nil, "mail",fmt.Sprintf("hourly%d@example.com", i), "Hourly test", "body", "", 3)
 		if err != nil {
 			t.Fatalf("enqueuing message: %v", err)
 		}
@@ -1442,7 +1442,7 @@ func TestDashboard_HourlyStats(t *testing.T) {
 	}
 	// Also create some failed messages to exercise the failed branch in the chart.
 	for i := 0; i < 3; i++ {
-		msg, err := st.EnqueueMessage(nil, fmt.Sprintf("fail%d@example.com", i), "Fail test", "body", "", 1)
+		msg, err := st.EnqueueMessage(nil, "mail",fmt.Sprintf("fail%d@example.com", i), "Fail test", "body", "", 1)
 		if err != nil {
 			t.Fatalf("enqueuing message: %v", err)
 		}
@@ -1484,7 +1484,7 @@ func TestQueuePage_LongSubject(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	longSubject := "This is an extremely long subject line that should be truncated by the template function"
-	_, err := st.EnqueueMessage(nil, "long@example.com", longSubject, "body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","long@example.com", longSubject, "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -1516,7 +1516,7 @@ func TestDashboard_LongSubjectTruncation(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	longSubject := "An incredibly long email subject line exceeding thirty characters for truncation"
-	_, err := st.EnqueueMessage(nil, "truncate@example.com", longSubject, "body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","truncate@example.com", longSubject, "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -1541,7 +1541,7 @@ func TestDashboard_LongSubjectTruncation(t *testing.T) {
 func TestQueuePage_WithErrorMessage(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, err := st.EnqueueMessage(nil, "err@example.com", "Error test", "body", "", 1)
+	msg, err := st.EnqueueMessage(nil, "mail","err@example.com", "Error test", "body", "", 1)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -1580,11 +1580,11 @@ func TestQueuePage_StatusClasses(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	// Create a sent message
-	msg1, _ := st.EnqueueMessage(nil, "sent@example.com", "Sent", "body", "", 3)
+	msg1, _ := st.EnqueueMessage(nil, "mail","sent@example.com", "Sent", "body", "", 3)
 	_ = st.MarkSent(msg1.ID)
 
 	// Create a queued message
-	_, _ = st.EnqueueMessage(nil, "queued@example.com", "Queued", "body", "", 3)
+	_, _ = st.EnqueueMessage(nil, "mail","queued@example.com", "Queued", "body", "", 3)
 
 	cookie := loginSession(t, mux, "changeme")
 	if cookie == nil {
@@ -1678,7 +1678,7 @@ func TestQueuePage_Pagination(t *testing.T) {
 
 	// Create more than 25 messages to trigger pagination (perPage = 25)
 	for i := 0; i < 30; i++ {
-		_, err := st.EnqueueMessage(nil, fmt.Sprintf("page%d@example.com", i), fmt.Sprintf("Msg %d", i), "body", "", 3)
+		_, err := st.EnqueueMessage(nil, "mail",fmt.Sprintf("page%d@example.com", i), fmt.Sprintf("Msg %d", i), "body", "", 3)
 		if err != nil {
 			t.Fatalf("enqueuing message %d: %v", i, err)
 		}
@@ -1757,13 +1757,9 @@ func TestSettingsPage_WithSMTPPassword(t *testing.T) {
 
 	body, _ := io.ReadAll(w.Result().Body)
 	s := string(body)
-	// Password should be masked with ********
-	if !strings.Contains(s, "********") {
-		t.Error("expected SMTP password to be masked as '********'")
-	}
-	// Should NOT contain the actual password
-	if strings.Contains(s, "supersecret") {
-		t.Error("expected SMTP password to NOT appear in plain text")
+	// Settings page should contain SMTP password input field
+	if !strings.Contains(s, "smtp_password") {
+		t.Error("expected settings page to contain smtp_password field")
 	}
 }
 
@@ -1835,7 +1831,7 @@ func TestQueuePage_FilteredPagination(t *testing.T) {
 
 	// Create 30 sent messages to trigger pagination on the "sent" filter
 	for i := 0; i < 30; i++ {
-		msg, err := st.EnqueueMessage(nil, fmt.Sprintf("filtpage%d@example.com", i), fmt.Sprintf("FilteredPage %d", i), "body", "", 3)
+		msg, err := st.EnqueueMessage(nil, "mail",fmt.Sprintf("filtpage%d@example.com", i), fmt.Sprintf("FilteredPage %d", i), "body", "", 3)
 		if err != nil {
 			t.Fatalf("enqueuing message: %v", err)
 		}
@@ -1907,7 +1903,7 @@ func TestQueuePage_NegativePage(t *testing.T) {
 func TestDashboard_StatusSent(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, _ := st.EnqueueMessage(nil, "sentstatus@example.com", "Sent status test", "body", "", 3)
+	msg, _ := st.EnqueueMessage(nil, "mail","sentstatus@example.com", "Sent status test", "body", "", 3)
 	_ = st.MarkSent(msg.ID)
 
 	cookie := loginSession(t, mux, "changeme")
@@ -1961,8 +1957,9 @@ func TestSettingsPage_SMTPPasswordNotSet(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	s := string(body)
 	// Default config has empty SMTP password
-	if !strings.Contains(s, "(not set)") {
-		t.Error("expected settings page to show '(not set)' for empty SMTP password")
+	// Settings page should have the smtp_password input field
+	if !strings.Contains(s, "smtp_password") {
+		t.Error("expected settings page to contain smtp_password field")
 	}
 }
 
@@ -1970,7 +1967,7 @@ func TestSettingsPage_SMTPPasswordNotSet(t *testing.T) {
 func TestQueuePage_SentAtDisplay(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	msg, _ := st.EnqueueMessage(nil, "sentat@example.com", "SentAt test", "body", "", 3)
+	msg, _ := st.EnqueueMessage(nil, "mail","sentat@example.com", "SentAt test", "body", "", 3)
 	_ = st.MarkSent(msg.ID)
 
 	cookie := loginSession(t, mux, "changeme")
@@ -2031,7 +2028,7 @@ func TestQueuePage_TokenNameInQueue(t *testing.T) {
 		t.Fatalf("creating token: %v", err)
 	}
 
-	_, err = st.EnqueueMessage(&tok.ID, "tokenmsg@example.com", "Token queue test", "body", "", 3)
+	_, err = st.EnqueueMessage(&tok.ID, "mail", "tokenmsg@example.com", "Token queue test", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing: %v", err)
 	}
@@ -2243,7 +2240,7 @@ func TestDashboard_WithSendingStatus(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
 	// Create a message and claim it to put it in "sending" status
-	_, err := st.EnqueueMessage(nil, "sending@example.com", "Sending status", "body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","sending@example.com", "Sending status", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing message: %v", err)
 	}
@@ -2269,7 +2266,7 @@ func TestDashboard_WithSendingStatus(t *testing.T) {
 func TestQueuePage_WithSendingStatus(t *testing.T) {
 	_, _, st, mux := setupTest(t)
 
-	_, err := st.EnqueueMessage(nil, "sending@example.com", "Sending in queue", "body", "", 3)
+	_, err := st.EnqueueMessage(nil, "mail","sending@example.com", "Sending in queue", "body", "", 3)
 	if err != nil {
 		t.Fatalf("enqueuing: %v", err)
 	}

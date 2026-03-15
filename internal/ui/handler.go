@@ -65,8 +65,11 @@ type TokenDetailContent struct {
 
 type SettingsContent struct {
 	Config       *config.Config
+	Settings     map[string]string
 	PasswordMsg  string
 	PasswordErr  bool
+	SettingsMsg  string
+	SettingsErr  bool
 }
 
 func NewHandler(st *store.Store, a *auth.Auth, cfg *config.Config, webFS fs.FS) *Handler {
@@ -103,6 +106,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /queue/{id}/delete", h.auth.RequireSession(h.handleDeleteMessage))
 	mux.HandleFunc("GET /settings", h.auth.RequireSession(h.handleSettings))
 	mux.HandleFunc("POST /settings/password", h.auth.RequireSession(h.handleChangePassword))
+	mux.HandleFunc("POST /settings/channels", h.auth.RequireSession(h.handleSaveChannels))
 }
 
 func (h *Handler) loadTemplates(webFS fs.FS) map[string]*template.Template {
@@ -166,6 +170,12 @@ func (h *Handler) loadTemplates(webFS fs.FS) map[string]*template.Template {
 				return "(not set)"
 			}
 			return "********"
+		},
+		"settingVal": func(settings map[string]string, key, fallback string) string {
+			if v, ok := settings[key]; ok && v != "" {
+				return v
+			}
+			return fallback
 		},
 		"add": func(a, b int) int {
 			return a + b
@@ -496,15 +506,24 @@ func (h *Handler) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 // --- Settings ---
 
 func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
-	msg := r.URL.Query().Get("msg")
-	isErr := r.URL.Query().Get("err") == "1"
+	pwMsg := r.URL.Query().Get("msg")
+	pwErr := r.URL.Query().Get("err") == "1"
+	chMsg := r.URL.Query().Get("ch_msg")
+	chErr := r.URL.Query().Get("ch_err") == "1"
+	settings, _ := h.store.GetAllSettings()
+	if settings == nil {
+		settings = make(map[string]string)
+	}
 	h.render(w, "settings", PageData{
 		Title:     "Settings",
 		ActiveNav: "settings",
 		Content: SettingsContent{
 			Config:      h.config,
-			PasswordMsg: msg,
-			PasswordErr: isErr,
+			Settings:    settings,
+			PasswordMsg: pwMsg,
+			PasswordErr: pwErr,
+			SettingsMsg: chMsg,
+			SettingsErr: chErr,
 		},
 	})
 }
@@ -528,4 +547,22 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/settings?msg=Password+changed+successfully", http.StatusSeeOther)
+}
+
+func (h *Handler) handleSaveChannels(w http.ResponseWriter, r *http.Request) {
+	keys := []string{
+		"smtp_host", "smtp_port", "smtp_username", "smtp_password", "smtp_from",
+		"smtp_tls", "smtp_auth_method",
+		"whatsapp_phone_id", "whatsapp_access_token", "whatsapp_api_version",
+		"telegram_bot_token", "telegram_parse_mode",
+	}
+	for _, key := range keys {
+		val := r.FormValue(key)
+		if err := h.store.SetSetting(key, val); err != nil {
+			log.Printf("ERROR saving setting %s: %v", key, err)
+			http.Redirect(w, r, "/settings?ch_err=1&ch_msg=Failed+to+save+settings", http.StatusSeeOther)
+			return
+		}
+	}
+	http.Redirect(w, r, "/settings?ch_msg=Channel+settings+saved.+Restart+server+to+apply.", http.StatusSeeOther)
 }

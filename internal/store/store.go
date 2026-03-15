@@ -29,6 +29,7 @@ type Message struct {
 	ID          int64
 	TokenID     *int64
 	TokenName   string
+	Channel     string
 	To          string
 	Subject     string
 	TextBody    string
@@ -129,8 +130,12 @@ func (s *Store) migrate() error {
 		value TEXT NOT NULL
 	);
 	`
-	_, err := s.db.Exec(schema)
-	return err
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	// Add channel column (idempotent migration for existing databases)
+	_, _ = s.db.Exec("ALTER TABLE messages ADD COLUMN channel TEXT DEFAULT 'mail'")
+	return nil
 }
 
 // --- Token operations ---
@@ -225,10 +230,13 @@ func (s *Store) DeleteToken(id int64) error {
 
 // --- Message operations ---
 
-func (s *Store) EnqueueMessage(tokenID *int64, to, subject, textBody, htmlBody string, maxRetries int) (*Message, error) {
+func (s *Store) EnqueueMessage(tokenID *int64, channel, to, subject, textBody, htmlBody string, maxRetries int) (*Message, error) {
+	if channel == "" {
+		channel = "mail"
+	}
 	result, err := s.db.Exec(
-		"INSERT INTO messages (token_id, to_addr, subject, text_body, html_body, max_attempts) VALUES (?, ?, ?, ?, ?, ?)",
-		tokenID, to, subject, textBody, htmlBody, maxRetries,
+		"INSERT INTO messages (token_id, channel, to_addr, subject, text_body, html_body, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		tokenID, channel, to, subject, textBody, htmlBody, maxRetries,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("enqueuing message: %w", err)
@@ -238,6 +246,7 @@ func (s *Store) EnqueueMessage(tokenID *int64, to, subject, textBody, htmlBody s
 	return &Message{
 		ID:          id,
 		TokenID:     tokenID,
+		Channel:     channel,
 		To:          to,
 		Subject:     subject,
 		TextBody:    textBody,
@@ -300,7 +309,7 @@ func (s *Store) ClaimPendingMessages(limit int) ([]Message, error) {
 
 	// Fetch the claimed messages
 	msgRows, err := tx.Query(
-		fmt.Sprintf(`SELECT id, token_id, to_addr, subject, text_body, html_body, attempts, max_attempts
+		fmt.Sprintf(`SELECT id, token_id, channel, to_addr, subject, text_body, html_body, attempts, max_attempts
 		FROM messages WHERE id IN (%s) ORDER BY created_at ASC`, inClause),
 		args...)
 	if err != nil {
@@ -312,7 +321,7 @@ func (s *Store) ClaimPendingMessages(limit int) ([]Message, error) {
 	for msgRows.Next() {
 		var m Message
 		var tokenID sql.NullInt64
-		if err := msgRows.Scan(&m.ID, &tokenID, &m.To, &m.Subject, &m.TextBody, &m.HTMLBody, &m.Attempts, &m.MaxAttempts); err != nil {
+		if err := msgRows.Scan(&m.ID, &tokenID, &m.Channel, &m.To, &m.Subject, &m.TextBody, &m.HTMLBody, &m.Attempts, &m.MaxAttempts); err != nil {
 			return nil, err
 		}
 		if tokenID.Valid {
@@ -367,14 +376,14 @@ func (s *Store) ListMessages(status string, limit, offset int) ([]Message, int64
 	if status != "" && status != "all" {
 		countQuery = "SELECT COUNT(*) FROM messages WHERE status = ?"
 		countArgs = []interface{}{status}
-		listQuery = `SELECT m.id, m.token_id, COALESCE(t.name, ''), m.to_addr, m.subject,
+		listQuery = `SELECT m.id, m.token_id, COALESCE(t.name, ''), m.channel, m.to_addr, m.subject,
 			m.status, m.attempts, m.last_error, m.created_at, m.sent_at
 			FROM messages m LEFT JOIN tokens t ON m.token_id = t.id
 			WHERE m.status = ? ORDER BY m.created_at DESC LIMIT ? OFFSET ?`
 		listArgs = []interface{}{status, limit, offset}
 	} else {
 		countQuery = "SELECT COUNT(*) FROM messages"
-		listQuery = `SELECT m.id, m.token_id, COALESCE(t.name, ''), m.to_addr, m.subject,
+		listQuery = `SELECT m.id, m.token_id, COALESCE(t.name, ''), m.channel, m.to_addr, m.subject,
 			m.status, m.attempts, m.last_error, m.created_at, m.sent_at
 			FROM messages m LEFT JOIN tokens t ON m.token_id = t.id
 			ORDER BY m.created_at DESC LIMIT ? OFFSET ?`
@@ -397,7 +406,7 @@ func (s *Store) ListMessages(status string, limit, offset int) ([]Message, int64
 		var m Message
 		var tokenID sql.NullInt64
 		var sentAt sql.NullTime
-		if err := rows.Scan(&m.ID, &tokenID, &m.TokenName, &m.To, &m.Subject,
+		if err := rows.Scan(&m.ID, &tokenID, &m.TokenName, &m.Channel, &m.To, &m.Subject,
 			&m.Status, &m.Attempts, &m.LastError, &m.CreatedAt, &sentAt); err != nil {
 			return nil, 0, err
 		}
@@ -486,7 +495,7 @@ func (s *Store) GetHourlyStats(hours int) ([]HourlyStat, error) {
 
 func (s *Store) GetRecentMessages(limit int) ([]Message, error) {
 	rows, err := s.db.Query(`
-		SELECT m.id, m.token_id, COALESCE(t.name, ''), m.to_addr, m.subject,
+		SELECT m.id, m.token_id, COALESCE(t.name, ''), m.channel, m.to_addr, m.subject,
 			m.status, m.attempts, m.last_error, m.created_at, m.sent_at
 		FROM messages m LEFT JOIN tokens t ON m.token_id = t.id
 		ORDER BY m.created_at DESC LIMIT ?`, limit)
@@ -500,7 +509,7 @@ func (s *Store) GetRecentMessages(limit int) ([]Message, error) {
 		var m Message
 		var tokenID sql.NullInt64
 		var sentAt sql.NullTime
-		if err := rows.Scan(&m.ID, &tokenID, &m.TokenName, &m.To, &m.Subject,
+		if err := rows.Scan(&m.ID, &tokenID, &m.TokenName, &m.Channel, &m.To, &m.Subject,
 			&m.Status, &m.Attempts, &m.LastError, &m.CreatedAt, &sentAt); err != nil {
 			return nil, err
 		}
@@ -560,7 +569,7 @@ func (s *Store) GetTokenMessages(tokenID int64, limit, offset int) ([]Message, i
 	}
 
 	rows, err := s.db.Query(`
-		SELECT m.id, m.token_id, COALESCE(t.name, ''), m.to_addr, m.subject,
+		SELECT m.id, m.token_id, COALESCE(t.name, ''), m.channel, m.to_addr, m.subject,
 			m.status, m.attempts, m.last_error, m.created_at, m.sent_at
 		FROM messages m LEFT JOIN tokens t ON m.token_id = t.id
 		WHERE m.token_id = ?
@@ -607,6 +616,23 @@ func (s *Store) SetSetting(key, value string) error {
 		key, value,
 	)
 	return err
+}
+
+func (s *Store) GetAllSettings() (map[string]string, error) {
+	rows, err := s.db.Query("SELECT key, value FROM settings")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	m := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		m[k] = v
+	}
+	return m, rows.Err()
 }
 
 func hashToken(raw string) string {

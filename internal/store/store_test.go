@@ -232,7 +232,7 @@ func TestEnqueueMessage(t *testing.T) {
 	}
 
 	tokenID := tok.ID
-	msg, err := s.EnqueueMessage(&tokenID, "user@example.com", "Test Subject", "text body", "<p>html</p>", 3)
+	msg, err := s.EnqueueMessage(&tokenID, "mail","user@example.com", "Test Subject", "text body", "<p>html</p>", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestClaimPendingMessages(t *testing.T) {
 
 	// Enqueue 3 messages
 	for i := 0; i < 3; i++ {
-		_, err := s.EnqueueMessage(nil, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Subject %d", i), "", "", 3)
+		_, err := s.EnqueueMessage(nil, "mail",fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Subject %d", i), "", "", 3)
 		if err != nil {
 			t.Fatalf("EnqueueMessage error: %v", err)
 		}
@@ -304,7 +304,7 @@ func TestClaimPendingMessages(t *testing.T) {
 func TestClaimPendingMessages_RespectRetryTime(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Retry Test", "", "", 3)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Retry Test", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestClaimPendingMessages_RespectRetryTime(t *testing.T) {
 func TestMarkSent(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Sent Test", "body", "", 3)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Sent Test", "body", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -389,7 +389,7 @@ func TestMarkSent(t *testing.T) {
 func TestMarkFailed_WithRetry(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Fail Test", "", "", 3)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Fail Test", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -460,7 +460,7 @@ func TestListMessages(t *testing.T) {
 
 	// Enqueue 5 messages
 	for i := 0; i < 5; i++ {
-		_, err := s.EnqueueMessage(nil, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Subject %d", i), "", "", 3)
+		_, err := s.EnqueueMessage(nil, "mail",fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Subject %d", i), "", "", 3)
 		if err != nil {
 			t.Fatalf("EnqueueMessage error: %v", err)
 		}
@@ -556,7 +556,7 @@ func TestListMessages(t *testing.T) {
 func TestDeleteMessage(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Delete Me", "", "", 3)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Delete Me", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -580,7 +580,7 @@ func TestDeleteMessage(t *testing.T) {
 func TestRetryMessage(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Retry Me", "", "", 1)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Retry Me", "", "", 1)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -619,7 +619,7 @@ func TestRetryMessage(t *testing.T) {
 func TestResetStuckMessages(t *testing.T) {
 	s := newTestStore(t)
 
-	_, err := s.EnqueueMessage(nil, "user@example.com", "Stuck", "", "", 3)
+	_, err := s.EnqueueMessage(nil, "mail","user@example.com", "Stuck", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -670,7 +670,7 @@ func TestGetDashboardStats(t *testing.T) {
 	// Create some messages with various statuses
 	// 2 will be sent, 1 will fail, 2 will stay queued
 	for i := 0; i < 5; i++ {
-		_, err := s.EnqueueMessage(nil, fmt.Sprintf("u%d@example.com", i), fmt.Sprintf("Subj %d", i), "", "", 1)
+		_, err := s.EnqueueMessage(nil, "mail",fmt.Sprintf("u%d@example.com", i), fmt.Sprintf("Subj %d", i), "", "", 1)
 		if err != nil {
 			t.Fatalf("EnqueueMessage error: %v", err)
 		}
@@ -717,7 +717,7 @@ func TestGetHourlyStats(t *testing.T) {
 	s := newTestStore(t)
 
 	// Enqueue and send a message
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Hourly", "", "", 3)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Hourly", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -757,7 +757,7 @@ func TestGetRecentMessages(t *testing.T) {
 
 	// Enqueue 5 messages
 	for i := 0; i < 5; i++ {
-		_, err := s.EnqueueMessage(nil, fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Recent %d", i), "", "", 3)
+		_, err := s.EnqueueMessage(nil, "mail",fmt.Sprintf("user%d@example.com", i), fmt.Sprintf("Recent %d", i), "", "", 3)
 		if err != nil {
 			t.Fatalf("EnqueueMessage error: %v", err)
 		}
@@ -801,7 +801,7 @@ func TestGetRecentMessages_WithTokenAndSentAt(t *testing.T) {
 	}
 	tokenID := tok.ID
 
-	msg, err := s.EnqueueMessage(&tokenID, "user@example.com", "With Token", "", "", 3)
+	msg, err := s.EnqueueMessage(&tokenID, "mail","user@example.com", "With Token", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -870,7 +870,7 @@ func TestListMessages_WithTokenName(t *testing.T) {
 	// This covers the tokenID.Valid and sentAt.Valid branches in ListMessages
 	_, tok, _ := s.CreateToken("list-tok")
 	tokenID := tok.ID
-	msg, err := s.EnqueueMessage(&tokenID, "user@example.com", "Token msg", "", "", 3)
+	msg, err := s.EnqueueMessage(&tokenID, "mail","user@example.com", "Token msg", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -903,7 +903,7 @@ func TestGetHourlyStats_WithFailed(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create a message that will be failed
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "Hourly Fail", "", "", 1)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "Hourly Fail", "", "", 1)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -955,7 +955,7 @@ func TestListTokens_WithLastUsed(t *testing.T) {
 func TestEnqueueMessage_NilTokenID(t *testing.T) {
 	s := newTestStore(t)
 
-	msg, err := s.EnqueueMessage(nil, "user@example.com", "No Token", "text", "<p>html</p>", 5)
+	msg, err := s.EnqueueMessage(nil, "mail","user@example.com", "No Token", "text", "<p>html</p>", 5)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -973,7 +973,7 @@ func TestClaimPendingMessages_WithTokenID(t *testing.T) {
 	// Create message with a token ID to cover the tokenID.Valid branch in ClaimPendingMessages
 	_, tok, _ := s.CreateToken("claim-tok")
 	tokenID := tok.ID
-	_, err := s.EnqueueMessage(&tokenID, "user@example.com", "With Token", "", "", 3)
+	_, err := s.EnqueueMessage(&tokenID, "mail","user@example.com", "With Token", "", "", 3)
 	if err != nil {
 		t.Fatalf("EnqueueMessage error: %v", err)
 	}
@@ -1000,9 +1000,9 @@ func TestNew_InvalidDSN(t *testing.T) {
 func TestListMessages_AllStatuses(t *testing.T) {
 	s := newTestStore(t)
 
-	m1, _ := s.EnqueueMessage(nil, "a@b.com", "S1", "t", "", 3)
-	m2, _ := s.EnqueueMessage(nil, "a@b.com", "S2", "t", "", 3)
-	_, _ = s.EnqueueMessage(nil, "a@b.com", "S3", "t", "", 3)
+	m1, _ := s.EnqueueMessage(nil, "mail","a@b.com", "S1", "t", "", 3)
+	m2, _ := s.EnqueueMessage(nil, "mail","a@b.com", "S2", "t", "", 3)
+	_, _ = s.EnqueueMessage(nil, "mail","a@b.com", "S3", "t", "", 3)
 
 	_, _ = s.ClaimPendingMessages(3)
 	_ = s.MarkSent(m1.ID)
@@ -1034,7 +1034,7 @@ func TestMarkFailed_ExceedsMaxRetries(t *testing.T) {
 	s := newTestStore(t)
 
 	// max_attempts=1: first failure should mark it failed
-	msg, _ := s.EnqueueMessage(nil, "x@y.com", "Sub", "t", "", 1)
+	msg, _ := s.EnqueueMessage(nil, "mail","x@y.com", "Sub", "t", "", 1)
 	_, _ = s.ClaimPendingMessages(1)
 
 	err := s.MarkFailed(msg.ID, "boom", time.Second)

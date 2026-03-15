@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"c0de-webhook/internal/mail"
 	"c0de-webhook/internal/store"
 )
 
@@ -26,7 +25,9 @@ type mockSender struct {
 	alwaysFail bool
 }
 
-var _ mail.Sender = (*mockSender)(nil)
+func mockChannelSender(ms *mockSender) ChannelSender {
+	return ChannelSender{Mail: ms}
+}
 
 func (m *mockSender) Send(to, subject, text, html string) error {
 	m.mu.Lock()
@@ -58,7 +59,7 @@ type blockingMockSender struct {
 	onSend func()
 }
 
-var _ mail.Sender = (*blockingMockSender)(nil)
+// blockingMockSender implements mail.Sender
 
 func (b *blockingMockSender) Send(_, _, _, _ string) error {
 	b.mu.Lock()
@@ -78,7 +79,7 @@ type closingMockSender struct {
 	store  *store.Store
 }
 
-var _ mail.Sender = (*closingMockSender)(nil)
+// closingMockSender implements mail.Sender
 
 func (c *closingMockSender) Send(_, _, _, _ string) error {
 	c.mu.Lock()
@@ -128,13 +129,13 @@ func TestNewWorker(t *testing.T) {
 	st := newTestStore(t)
 	defer st.Close()
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 4, 500*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),4, 500*time.Millisecond)
 
 	if w.store != st {
 		t.Error("store not set correctly")
 	}
-	if w.sender != ms {
-		t.Error("sender not set correctly")
+	if w.senders.Mail != ms {
+		t.Error("mail sender not set correctly")
 	}
 	if w.workers != 4 {
 		t.Errorf("workers: got %d, want 4", w.workers)
@@ -153,11 +154,11 @@ func TestNewWorker(t *testing.T) {
 func TestWorkerProcessesMessages(t *testing.T) {
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 2, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),2, 10*time.Millisecond)
 
 	for i := 0; i < 3; i++ {
-		_, err := st.EnqueueMessage(nil,
-			"user@example.com",
+		_, err := st.EnqueueMessage(nil, "mail",
+"user@example.com",
 			fmt.Sprintf("Subject %c", 'A'+i),
 			"text body", "html body", 3)
 		if err != nil {
@@ -210,9 +211,9 @@ func TestWorkerRetryOnFailure(t *testing.T) {
 		failNext: true,
 		failErr:  errors.New("temporary error"),
 	}
-	w := NewWorker(st, ms, 1, 1*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 1*time.Millisecond)
 
-	_, err := st.EnqueueMessage(nil,
+	_, err := st.EnqueueMessage(nil, "mail",
 		"retry@example.com", "Retry Subject",
 		"retry text", "retry html", 3)
 	if err != nil {
@@ -250,9 +251,9 @@ func TestWorkerMaxRetries(t *testing.T) {
 		alwaysFail: true,
 		failErr:    errors.New("permanent error"),
 	}
-	w := NewWorker(st, ms, 1, 1*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 1*time.Millisecond)
 
-	_, err := st.EnqueueMessage(nil,
+	_, err := st.EnqueueMessage(nil, "mail",
 		"fail@example.com", "Fail Subject",
 		"fail text", "fail html", 2)
 	if err != nil {
@@ -294,7 +295,7 @@ func TestWorkerMaxRetries(t *testing.T) {
 func TestWorkerGracefulShutdown(t *testing.T) {
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 2, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),2, 10*time.Millisecond)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	w.Start(ctx)
@@ -321,7 +322,7 @@ func TestWorkerResetStuckMessages(t *testing.T) {
 	st := newTestStore(t)
 	ms := &mockSender{}
 
-	msg, err := st.EnqueueMessage(nil,
+	msg, err := st.EnqueueMessage(nil, "mail",
 		"stuck@example.com", "Stuck Subject",
 		"stuck text", "stuck html", 3)
 	if err != nil {
@@ -347,7 +348,7 @@ func TestWorkerResetStuckMessages(t *testing.T) {
 	}
 
 	// Start() calls ResetStuckMessages, moving it back to 'queued'.
-	w := NewWorker(st, ms, 1, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 10*time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 	w.Start(ctx)
 
@@ -381,7 +382,7 @@ func TestWorkerResetStuckMessages(t *testing.T) {
 func TestWorkerNoMessagesNoError(t *testing.T) {
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 1, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 10*time.Millisecond)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	w.Start(ctx)
@@ -401,11 +402,11 @@ func TestWorkerNoMessagesNoError(t *testing.T) {
 func TestWorkerMultipleWorkers(t *testing.T) {
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 4, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),4, 10*time.Millisecond)
 
 	for i := 0; i < 10; i++ {
-		_, err := st.EnqueueMessage(nil,
-			"multi@example.com", "Multi Subject",
+		_, err := st.EnqueueMessage(nil, "mail",
+"multi@example.com", "Multi Subject",
 			"text", "html", 3)
 		if err != nil {
 			t.Fatalf("enqueue %d: %v", i, err)
@@ -446,9 +447,9 @@ func TestWorkerCancelDuringProcessing(t *testing.T) {
 		},
 	}
 
-	w := NewWorker(st, sender, 1, 10*time.Millisecond)
+	w := NewWorker(st, ChannelSender{Mail: sender}, 1, 10*time.Millisecond)
 
-	_, err := st.EnqueueMessage(nil,
+	_, err := st.EnqueueMessage(nil, "mail",
 		"cancel@example.com", "Cancel Subject",
 		"text", "html", 3)
 	if err != nil {
@@ -480,7 +481,7 @@ func TestWorkerClaimErrorContinues(t *testing.T) {
 	// the worker starts, forcing ClaimPendingMessages to fail.
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 1, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 10*time.Millisecond)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	w.Start(ctx)
@@ -513,9 +514,9 @@ func TestWorkerMarkSentError(t *testing.T) {
 	st := newTestStore(t)
 
 	sender := &closingMockSender{store: st}
-	w := NewWorker(st, sender, 1, 10*time.Millisecond)
+	w := NewWorker(st, ChannelSender{Mail: sender}, 1, 10*time.Millisecond)
 
-	_, err := st.EnqueueMessage(nil,
+	_, err := st.EnqueueMessage(nil, "mail",
 		"markerr@example.com", "Mark Error",
 		"text", "html", 3)
 	if err != nil {
@@ -563,9 +564,9 @@ func TestWorkerMarkFailedError(t *testing.T) {
 		sendErr: errors.New("send failed"),
 	}
 
-	w := NewWorker(st, failCloseSender, 1, 10*time.Millisecond)
+	w := NewWorker(st, ChannelSender{Mail: failCloseSender}, 1, 10*time.Millisecond)
 
-	_, err := st.EnqueueMessage(nil,
+	_, err := st.EnqueueMessage(nil, "mail",
 		"markfailerr@example.com", "MarkFailed Error",
 		"text", "html", 3)
 	if err != nil {
@@ -607,7 +608,7 @@ func TestWorkerResetStuckMessagesError(t *testing.T) {
 	// by closing the store before calling Start().
 	st := newTestStore(t)
 	ms := &mockSender{}
-	w := NewWorker(st, ms, 1, 10*time.Millisecond)
+	w := NewWorker(st, mockChannelSender(ms),1, 10*time.Millisecond)
 
 	// Close the store so ResetStuckMessages will fail.
 	st.Close()
@@ -651,13 +652,13 @@ func TestWorkerDispatchCancelDuringChannelSend(t *testing.T) {
 	// 1 worker with channel capacity 2 (workers*2=2).
 	// Worker will be blocked by sender, so at most 1 message is consumed
 	// from channel. If we queue enough messages, the channel will fill up.
-	w := NewWorker(st, sender, 1, 10*time.Millisecond)
+	w := NewWorker(st, ChannelSender{Mail: sender}, 1, 10*time.Millisecond)
 
 	// Enqueue many messages so dispatch has more to send than the channel
 	// can hold.
 	for i := 0; i < 10; i++ {
-		_, err := st.EnqueueMessage(nil,
-			"dispatch@example.com", "Dispatch Test",
+		_, err := st.EnqueueMessage(nil, "mail",
+"dispatch@example.com", "Dispatch Test",
 			"text", "html", 3)
 		if err != nil {
 			t.Fatalf("enqueue %d: %v", i, err)
@@ -711,7 +712,7 @@ type failThenCloseSender struct {
 	sendErr error
 }
 
-var _ mail.Sender = (*failThenCloseSender)(nil)
+// failThenCloseSender implements mail.Sender
 
 func (f *failThenCloseSender) Send(_, _, _, _ string) error {
 	f.mu.Lock()

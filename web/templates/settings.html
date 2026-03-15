@@ -1,4 +1,7 @@
 {{define "content"}}
+{{$s := .Content.Settings}}
+{{$c := .Content.Config}}
+
 <section class="form-section" style="margin-bottom: 20px;">
     <h2 class="section-title">Change Admin Password</h2>
     {{if .Content.PasswordMsg}}
@@ -25,83 +28,133 @@
     </form>
 </section>
 
+<form method="POST" action="/settings/channels">
+{{if .Content.SettingsMsg}}
+<div style="padding: 8px 12px; border-radius: 4px; margin-bottom: 14px; font-size: 0.9rem;
+    {{if .Content.SettingsErr}}background: var(--red-bg); color: var(--red); border: 1px solid #e8b4ac;
+    {{else}}background: var(--green-bg); color: var(--green); border: 1px solid #b4d9a6;{{end}}">
+    {{.Content.SettingsMsg}}
+</div>
+{{end}}
+
 <div class="settings-grid">
     <section class="settings-card">
-        <h2 class="settings-card-title">Server</h2>
-        <dl class="settings-list">
-            <div class="settings-item">
-                <dt>Host</dt>
-                <dd>{{.Content.Config.Server.Host}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Port</dt>
-                <dd>{{.Content.Config.Server.Port}}</dd>
-            </div>
-        </dl>
+        <h2 class="settings-card-title">SMTP (Email)</h2>
+        <div class="form-group">
+            <label class="form-label">SMTP Host</label>
+            <input type="text" name="smtp_host" class="form-input" value="{{settingVal $s "smtp_host" $c.SMTP.Host}}" placeholder="smtp.example.com">
+        </div>
+        <div class="form-group">
+            <label class="form-label">SMTP Port</label>
+            <input type="text" name="smtp_port" class="form-input" value="{{settingVal $s "smtp_port" ""}}" placeholder="587">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" name="smtp_username" class="form-input" value="{{settingVal $s "smtp_username" $c.SMTP.Username}}" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" name="smtp_password" class="form-input" value="{{settingVal $s "smtp_password" ""}}" placeholder="Leave blank to keep current">
+        </div>
+        <div class="form-group">
+            <label class="form-label">From Address</label>
+            <input type="text" name="smtp_from" class="form-input" value="{{settingVal $s "smtp_from" $c.SMTP.From}}" placeholder="noreply@example.com">
+        </div>
+        <div class="form-group">
+            <label class="form-label">TLS</label>
+            <select name="smtp_tls" class="form-input">
+                <option value="false" {{if eq (settingVal $s "smtp_tls" "") "true"}}{{else}}selected{{end}}>Disabled</option>
+                <option value="true" {{if eq (settingVal $s "smtp_tls" "") "true"}}selected{{end}}>Enabled (STARTTLS)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Auth Method</label>
+            <select name="smtp_auth_method" class="form-input">
+                {{$authMethod := settingVal $s "smtp_auth_method" $c.SMTP.AuthMethod}}
+                <option value="none" {{if eq $authMethod "none"}}selected{{end}}>None</option>
+                <option value="plain" {{if eq $authMethod "plain"}}selected{{end}}>PLAIN</option>
+                <option value="login" {{if eq $authMethod "login"}}selected{{end}}>LOGIN (M365)</option>
+                <option value="crammd5" {{if eq $authMethod "crammd5"}}selected{{end}}>CRAM-MD5</option>
+            </select>
+        </div>
     </section>
 
     <section class="settings-card">
-        <h2 class="settings-card-title">SMTP</h2>
-        <dl class="settings-list">
-            <div class="settings-item">
-                <dt>Host</dt>
-                <dd>{{.Content.Config.SMTP.Host}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Port</dt>
-                <dd>{{.Content.Config.SMTP.Port}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Username</dt>
-                <dd>{{.Content.Config.SMTP.Username}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Password</dt>
-                <dd>{{maskPassword .Content.Config.SMTP.Password}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>From</dt>
-                <dd>{{.Content.Config.SMTP.From}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>TLS</dt>
-                <dd>{{if .Content.Config.SMTP.TLS}}Enabled{{else}}Disabled{{end}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Auth Method</dt>
-                <dd>{{.Content.Config.SMTP.AuthMethod}}</dd>
-            </div>
-        </dl>
+        <h2 class="settings-card-title">WhatsApp Business API</h2>
+        <p style="font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 12px;">
+            Requires a Meta Business account. Get credentials from
+            <a href="https://developers.facebook.com" target="_blank">developers.facebook.com</a>.
+        </p>
+        <div class="form-group">
+            <label class="form-label">Phone Number ID</label>
+            <input type="text" name="whatsapp_phone_id" class="form-input" value="{{settingVal $s "whatsapp_phone_id" ""}}" placeholder="e.g. 123456789012345">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Access Token</label>
+            <input type="password" name="whatsapp_access_token" class="form-input" value="{{settingVal $s "whatsapp_access_token" ""}}" placeholder="Permanent access token">
+        </div>
+        <div class="form-group">
+            <label class="form-label">API Version</label>
+            <input type="text" name="whatsapp_api_version" class="form-input" value="{{settingVal $s "whatsapp_api_version" "v21.0"}}" placeholder="v21.0">
+        </div>
     </section>
 
     <section class="settings-card">
-        <h2 class="settings-card-title">Queue</h2>
-        <dl class="settings-list">
-            <div class="settings-item">
-                <dt>Workers</dt>
-                <dd>{{.Content.Config.Queue.Workers}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Max Retries</dt>
-                <dd>{{.Content.Config.Queue.MaxRetries}}</dd>
-            </div>
-            <div class="settings-item">
-                <dt>Retry Delay</dt>
-                <dd>{{.Content.Config.Queue.RetryDelay}}</dd>
-            </div>
-        </dl>
+        <h2 class="settings-card-title">Telegram Bot API</h2>
+        <p style="font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 12px;">
+            Create a bot via <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram.
+        </p>
+        <div class="form-group">
+            <label class="form-label">Bot Token</label>
+            <input type="password" name="telegram_bot_token" class="form-input" value="{{settingVal $s "telegram_bot_token" ""}}" placeholder="e.g. 123456:ABC-DEF...">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parse Mode</label>
+            <select name="telegram_parse_mode" class="form-input">
+                {{$parseMode := settingVal $s "telegram_parse_mode" ""}}
+                <option value="" {{if eq $parseMode ""}}selected{{end}}>Plain Text</option>
+                <option value="HTML" {{if eq $parseMode "HTML"}}selected{{end}}>HTML</option>
+                <option value="Markdown" {{if eq $parseMode "Markdown"}}selected{{end}}>Markdown</option>
+            </select>
+        </div>
     </section>
 
     <section class="settings-card">
-        <h2 class="settings-card-title">Database</h2>
+        <h2 class="settings-card-title">Server &amp; Queue</h2>
         <dl class="settings-list">
-            <div class="settings-item">
-                <dt>Path</dt>
-                <dd>{{.Content.Config.Database.Path}}</dd>
-            </div>
+            <div class="settings-item"><dt>Host</dt><dd>{{$c.Server.Host}}</dd></div>
+            <div class="settings-item"><dt>Port</dt><dd>{{$c.Server.Port}}</dd></div>
+            <div class="settings-item"><dt>Workers</dt><dd>{{$c.Queue.Workers}}</dd></div>
+            <div class="settings-item"><dt>Max Retries</dt><dd>{{$c.Queue.MaxRetries}}</dd></div>
+            <div class="settings-item"><dt>Retry Delay</dt><dd>{{$c.Queue.RetryDelay}}</dd></div>
+            <div class="settings-item"><dt>Database</dt><dd>{{$c.Database.Path}}</dd></div>
         </dl>
     </section>
 </div>
 
-<p class="settings-note">Other settings are managed via config file. Restart the server after changes.</p>
+<div style="margin-top: 16px;">
+    <button type="submit" class="btn btn-primary">Save Channel Settings</button>
+    <span style="font-size: 0.85rem; color: var(--fg-muted); margin-left: 12px;">Restart server after saving to apply changes.</span>
+</div>
+</form>
+
+<h2 class="section-title" style="margin-top: 32px;">API Endpoints</h2>
+<div class="settings-grid">
+    <section class="settings-card">
+        <h2 class="settings-card-title">v2 API</h2>
+        <dl class="settings-list">
+            <div class="settings-item"><dt>Email</dt><dd>POST /api/v2/mail</dd></div>
+            <div class="settings-item"><dt>WhatsApp</dt><dd>POST /api/v2/whatsapp</dd></div>
+            <div class="settings-item"><dt>Telegram</dt><dd>POST /api/v2/telegram</dd></div>
+            <div class="settings-item"><dt>Health</dt><dd>GET /api/v2/health</dd></div>
+        </dl>
+    </section>
+    <section class="settings-card">
+        <h2 class="settings-card-title">v1 API (legacy)</h2>
+        <dl class="settings-list">
+            <div class="settings-item"><dt>Send Email</dt><dd>POST /api/v1/send</dd></div>
+            <div class="settings-item"><dt>Health</dt><dd>GET /api/v1/health</dd></div>
+        </dl>
+    </section>
+</div>
 {{end}}

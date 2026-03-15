@@ -2,27 +2,38 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"c0de-webhook/internal/mail"
 	"c0de-webhook/internal/store"
+	"c0de-webhook/internal/telegram"
+	"c0de-webhook/internal/whatsapp"
 )
+
+// ChannelSender provides Send methods for each channel type.
+// Nil senders are allowed — messages for unconfigured channels will fail gracefully.
+type ChannelSender struct {
+	Mail     mail.Sender
+	WhatsApp *whatsapp.BusinessSender
+	Telegram *telegram.Sender
+}
 
 type Worker struct {
 	store      *store.Store
-	sender     mail.Sender
+	senders    ChannelSender
 	workers    int
 	retryDelay time.Duration
 	ch         chan store.Message
 	wg         sync.WaitGroup
 }
 
-func NewWorker(st *store.Store, sender mail.Sender, workers int, retryDelay time.Duration) *Worker {
+func NewWorker(st *store.Store, senders ChannelSender, workers int, retryDelay time.Duration) *Worker {
 	return &Worker{
 		store:      st,
-		sender:     sender,
+		senders:    senders,
 		workers:    workers,
 		retryDelay: retryDelay,
 		ch:         make(chan store.Message, workers*2),
@@ -30,18 +41,15 @@ func NewWorker(st *store.Store, sender mail.Sender, workers int, retryDelay time
 }
 
 func (w *Worker) Start(ctx context.Context) {
-	// Reset any messages stuck in "sending" from a previous crash
 	if err := w.store.ResetStuckMessages(); err != nil {
 		log.Printf("WARNING: failed to reset stuck messages: %v", err)
 	}
 
-	// Start worker goroutines
 	for i := 0; i < w.workers; i++ {
 		w.wg.Add(1)
 		go w.process(ctx, i)
 	}
 
-	// Start dispatcher
 	w.wg.Add(1)
 	go w.dispatch(ctx)
 
@@ -91,9 +99,9 @@ func (w *Worker) process(ctx context.Context, id int) {
 		default:
 		}
 
-		log.Printf("Worker %d: sending message %d to %s", id, msg.ID, msg.To)
+		log.Printf("Worker %d: [%s] sending message %d to %s", id, msg.Channel, msg.ID, msg.To)
 
-		err := w.sender.Send(msg.To, msg.Subject, msg.TextBody, msg.HTMLBody)
+		err := w.sendByChannel(msg)
 		if err != nil {
 			log.Printf("Worker %d: message %d failed: %v", id, msg.ID, err)
 			if markErr := w.store.MarkFailed(msg.ID, err.Error(), w.retryDelay); markErr != nil {
@@ -105,5 +113,27 @@ func (w *Worker) process(ctx context.Context, id int) {
 				log.Printf("Worker %d: failed to mark message %d as sent: %v", id, msg.ID, markErr)
 			}
 		}
+	}
+}
+
+func (w *Worker) sendByChannel(msg store.Message) error {
+	switch msg.Channel {
+	case "whatsapp":
+		if w.senders.WhatsApp == nil || !w.senders.WhatsApp.Configured() {
+			return fmt.Errorf("whatsapp sender not configured")
+		}
+		return w.senders.WhatsApp.Send(msg.To, msg.TextBody)
+	case "telegram":
+		if w.senders.Telegram == nil || !w.senders.Telegram.Configured() {
+			return fmt.Errorf("telegram sender not configured")
+		}
+		return w.senders.Telegram.Send(msg.To, msg.TextBody)
+	case "mail", "":
+		if w.senders.Mail == nil {
+			return fmt.Errorf("mail sender not configured")
+		}
+		return w.senders.Mail.Send(msg.To, msg.Subject, msg.TextBody, msg.HTMLBody)
+	default:
+		return fmt.Errorf("unknown channel: %s", msg.Channel)
 	}
 }

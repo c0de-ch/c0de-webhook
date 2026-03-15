@@ -18,6 +18,7 @@
                     <th>Token</th>
                     <th>To</th>
                     <th>Subject</th>
+                    <th>Channel</th>
                     <th>Status</th>
                     <th>Attempts</th>
                     <th>Error</th>
@@ -32,6 +33,7 @@
                     <td>{{.TokenName}}</td>
                     <td class="cell-mono">{{.To}}</td>
                     <td title="{{.Subject}}">{{truncate .Subject 30}}</td>
+                    <td style="font-size: 0.82rem;">{{.Channel}}</td>
                     <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
                     <td style="text-align: center;">{{.Attempts}}</td>
                     <td title="{{.LastError}}" class="cell-muted" style="font-size: 0.85rem;">{{truncate .LastError 40}}</td>
@@ -49,7 +51,7 @@
                 </tr>
                 {{else}}
                 <tr>
-                    <td colspan="9" class="empty-row">No messages in queue</td>
+                    <td colspan="10" class="empty-row">No messages in queue</td>
                 </tr>
                 {{end}}
             </tbody>

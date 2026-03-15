@@ -17,8 +17,10 @@ import (
 	"c0de-webhook/internal/mail"
 	"c0de-webhook/internal/queue"
 	"c0de-webhook/internal/store"
+	"c0de-webhook/internal/telegram"
 	"c0de-webhook/internal/ui"
 	"c0de-webhook/internal/webhook"
+	"c0de-webhook/internal/whatsapp"
 	"c0de-webhook/web"
 )
 
@@ -35,32 +37,27 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Ensure database directory exists
 	if err := os.MkdirAll("data", 0755); err != nil && !os.IsExist(err) {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
-	// Initialize store
 	st, err := store.New(cfg.Database.Path)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer st.Close()
 
-	// Initialize auth
 	a := auth.New(st, cfg.Server.AdminPassword, cfg.Server.SecretKey)
 
-	// Initialize SMTP sender
-	sender := mail.NewSMTPSender(cfg.SMTP)
+	// Build channel senders — load config from DB settings with config file fallback
+	senders := buildSenders(st, cfg)
 
-	// Initialize queue workers
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	w := queue.NewWorker(st, sender, cfg.Queue.Workers, cfg.Queue.RetryDuration)
+	w := queue.NewWorker(st, senders, cfg.Queue.Workers, cfg.Queue.RetryDuration)
 	w.Start(ctx)
 
-	// Session cleanup ticker
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -74,10 +71,8 @@ func main() {
 		}
 	}()
 
-	// Setup HTTP routes
 	mux := http.NewServeMux()
 
-	// Web UI
 	webFS, err := fs.Sub(web.Files, ".")
 	if err != nil {
 		log.Fatalf("Failed to setup web filesystem: %v", err)
@@ -85,11 +80,9 @@ func main() {
 	uiHandler := ui.NewHandler(st, a, cfg, webFS)
 	uiHandler.RegisterRoutes(mux)
 
-	// API
 	webhookHandler := webhook.NewHandler(st, a, cfg.Queue.MaxRetries)
 	webhookHandler.RegisterRoutes(mux)
 
-	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -99,7 +92,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Graceful shutdown
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -114,7 +106,48 @@ func main() {
 
 	log.Printf("Starting c0de-webhook on %s", addr)
 	log.Printf("Admin UI: http://%s", addr)
+	log.Printf("Channels: mail=yes whatsapp=%v telegram=%v",
+		senders.WhatsApp != nil && senders.WhatsApp.Configured(),
+		senders.Telegram != nil && senders.Telegram.Configured())
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
+	}
+}
+
+func buildSenders(st *store.Store, cfg *config.Config) queue.ChannelSender {
+	settings, _ := st.GetAllSettings()
+
+	// Mail sender — DB settings override config file
+	smtpCfg := cfg.SMTP
+	if v, ok := settings["smtp_host"]; ok && v != "" {
+		smtpCfg.Host = v
+	}
+	if v, ok := settings["smtp_from"]; ok && v != "" {
+		smtpCfg.From = v
+	}
+
+	// WhatsApp Business API
+	var waSender *whatsapp.BusinessSender
+	waPhoneID, _ := settings["whatsapp_phone_id"]
+	waToken, _ := settings["whatsapp_access_token"]
+	waVersion, _ := settings["whatsapp_api_version"]
+	if waPhoneID != "" && waToken != "" {
+		waSender = whatsapp.NewBusinessSender(waPhoneID, waToken, waVersion)
+		log.Printf("WhatsApp Business API configured (phone_id=%s)", waPhoneID)
+	}
+
+	// Telegram Bot API
+	var tgSender *telegram.Sender
+	tgToken, _ := settings["telegram_bot_token"]
+	tgParseMode, _ := settings["telegram_parse_mode"]
+	if tgToken != "" {
+		tgSender = telegram.NewSender(tgToken, tgParseMode)
+		log.Printf("Telegram Bot API configured")
+	}
+
+	return queue.ChannelSender{
+		Mail:     mail.NewSMTPSender(smtpCfg),
+		WhatsApp: waSender,
+		Telegram: tgSender,
 	}
 }
