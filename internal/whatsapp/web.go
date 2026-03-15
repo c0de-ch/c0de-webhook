@@ -169,7 +169,7 @@ func (wc *WebClient) Disconnect() {
 	wc.mu.Lock()
 	defer wc.mu.Unlock()
 	if wc.client != nil {
-		wc.client.Logout(context.Background())
+		_ = wc.client.Logout(context.Background())
 		wc.linking = false
 		wc.qrPNG = nil
 	}

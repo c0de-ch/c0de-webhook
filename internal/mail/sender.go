@@ -39,7 +39,7 @@ func (s *SMTPSender) Send(to, subject, textBody, htmlBody string) error {
 	if err != nil {
 		return fmt.Errorf("connecting to SMTP: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if auth := s.buildAuth(); auth != nil {
 		if err := client.Auth(auth); err != nil {
@@ -104,7 +104,7 @@ func (s *SMTPSender) connect() (*smtp.Client, error) {
 		}
 		if s.cfg.TLS {
 			if err := client.StartTLS(tlsConfig); err != nil {
-				client.Close()
+				_ = client.Close()
 				return nil, fmt.Errorf("STARTTLS: %w", err)
 			}
 		}
@@ -164,10 +164,10 @@ func parseRecipients(to string) []string {
 func buildMessage(from string, to []string, subject, textBody, htmlBody string) []byte {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	b.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
-	b.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
-	b.WriteString(fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123Z)))
+	fmt.Fprintf(&b, "From: %s\r\n", from)
+	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(to, ", "))
+	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
+	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
 	b.WriteString("MIME-Version: 1.0\r\n")
 
 	hasText := textBody != ""
@@ -176,17 +176,17 @@ func buildMessage(from string, to []string, subject, textBody, htmlBody string) 
 	switch {
 	case hasText && hasHTML:
 		boundary := fmt.Sprintf("----=_Part_%d", time.Now().UnixNano())
-		b.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary))
+		fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary)
 		b.WriteString("\r\n")
-		b.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+		fmt.Fprintf(&b, "--%s\r\n", boundary)
 		b.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n")
 		b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
 		b.WriteString(textBody)
-		b.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
+		fmt.Fprintf(&b, "\r\n--%s\r\n", boundary)
 		b.WriteString("Content-Type: text/html; charset=\"utf-8\"\r\n")
 		b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
 		b.WriteString(htmlBody)
-		b.WriteString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
+		fmt.Fprintf(&b, "\r\n--%s--\r\n", boundary)
 	case hasHTML:
 		b.WriteString("Content-Type: text/html; charset=\"utf-8\"\r\n")
 		b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")

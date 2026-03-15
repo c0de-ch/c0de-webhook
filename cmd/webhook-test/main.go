@@ -103,7 +103,7 @@ func main() {
 		}
 
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if resp.StatusCode == http.StatusAccepted {
 			var sr SendResponse
@@ -130,7 +130,7 @@ func checkHealth(url string) {
 		fmt.Fprintf(os.Stderr, "Health check failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode == 200 {

@@ -75,17 +75,17 @@ func New(dsn string) (*Store, error) {
 
 	// Enable WAL mode for better concurrent access
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("setting WAL mode: %w", err)
 	}
 	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
 	s := &Store{db: db}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("running migrations: %w", err)
 	}
 	return s, nil
@@ -172,7 +172,7 @@ func (s *Store) ListTokens() ([]Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tokens []Token
 	for rows.Next() {
@@ -277,12 +277,12 @@ func (s *Store) ClaimPendingMessages(limit int) ([]Message, error) {
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		ids = append(ids, id)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (s *Store) ClaimPendingMessages(limit int) ([]Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer msgRows.Close()
+	defer func() { _ = msgRows.Close() }()
 
 	var msgs []Message
 	for msgRows.Next() {
@@ -399,7 +399,7 @@ func (s *Store) ListMessages(status string, limit, offset int) ([]Message, int64
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var msgs []Message
 	for rows.Next() {
@@ -478,7 +478,7 @@ func (s *Store) GetHourlyStats(hours int) ([]HourlyStat, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stats []HourlyStat
 	for rows.Next() {
@@ -502,7 +502,7 @@ func (s *Store) GetRecentMessages(limit int) ([]Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var msgs []Message
 	for rows.Next() {
@@ -549,7 +549,7 @@ func (s *Store) GetTokenStats() ([]TokenStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stats []TokenStats
 	for rows.Next() {
@@ -577,7 +577,7 @@ func (s *Store) GetTokenMessages(tokenID int64, limit, offset int) ([]Message, i
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var msgs []Message
 	for rows.Next() {
@@ -623,7 +623,7 @@ func (s *Store) GetAllSettings() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	m := make(map[string]string)
 	for rows.Next() {
 		var k, v string

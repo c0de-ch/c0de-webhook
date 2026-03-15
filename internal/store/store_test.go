@@ -13,7 +13,7 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatalf("failed to create test store: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -22,7 +22,7 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(:memory:) returned error: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	if s.db == nil {
 		t.Fatal("expected db to be non-nil")

@@ -529,7 +529,7 @@ func (m *mockSMTPServer) serve(t *testing.T) {
 	if err != nil {
 		return // listener closed
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	m.mu.Lock()
 	m.connCount++
@@ -606,7 +606,7 @@ func (m *mockSMTPServer) serve(t *testing.T) {
 
 func TestSend_WithMockSMTP(t *testing.T) {
 	mock := newMockSMTPServer(t)
-	defer mock.listener.Close()
+	defer func() { _ = mock.listener.Close() }()
 
 	// Run mock server in background.
 	go mock.serve(t)
@@ -652,7 +652,7 @@ func TestSend_WithMockSMTP(t *testing.T) {
 
 func TestSend_MultipleRecipients_MockSMTP(t *testing.T) {
 	mock := newMockSMTPServer(t)
-	defer mock.listener.Close()
+	defer func() { _ = mock.listener.Close() }()
 
 	go mock.serve(t)
 
@@ -679,7 +679,7 @@ func TestSend_MultipleRecipients_MockSMTP(t *testing.T) {
 
 func TestSend_HTMLAndText_MockSMTP(t *testing.T) {
 	mock := newMockSMTPServer(t)
-	defer mock.listener.Close()
+	defer func() { _ = mock.listener.Close() }()
 
 	go mock.serve(t)
 
@@ -748,7 +748,7 @@ func TestConnect_STARTTLS_Failure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	go func() {
@@ -756,7 +756,7 @@ func TestConnect_STARTTLS_Failure(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 		reader := bufio.NewReader(conn)
@@ -857,7 +857,7 @@ func TestConnect_PlainNoTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	go func() {
@@ -865,7 +865,7 @@ func TestConnect_PlainNoTLS(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 		reader := bufio.NewReader(conn)
 		fmt.Fprintf(conn, "220 localhost ESMTP\r\n")
@@ -898,7 +898,7 @@ func TestConnect_PlainNoTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect() failed: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	_ = client.Quit()
 }
 

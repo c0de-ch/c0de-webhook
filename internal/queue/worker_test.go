@@ -85,7 +85,7 @@ func (c *closingMockSender) Send(_, _, _, _ string) error {
 	c.mu.Lock()
 	c.called = true
 	c.mu.Unlock()
-	c.store.Close()
+	_ = c.store.Close()
 	return nil
 }
 
@@ -127,7 +127,7 @@ func pollUntil(deadline, interval time.Duration, check func() bool) bool {
 
 func TestNewWorker(t *testing.T) {
 	st := newTestStore(t)
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 	ms := &mockSender{}
 	w := NewWorker(st, mockChannelSender(ms),4, 500*time.Millisecond)
 
@@ -202,7 +202,7 @@ func TestWorkerProcessesMessages(t *testing.T) {
 		}
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerRetryOnFailure(t *testing.T) {
@@ -242,7 +242,7 @@ func TestWorkerRetryOnFailure(t *testing.T) {
 		t.Errorf("expected 1 sent in store, got %d", len(msgs))
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerMaxRetries(t *testing.T) {
@@ -289,7 +289,7 @@ func TestWorkerMaxRetries(t *testing.T) {
 		t.Errorf("expected 0 sent messages, got %d", len(ms.getSent()))
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerGracefulShutdown(t *testing.T) {
@@ -315,7 +315,7 @@ func TestWorkerGracefulShutdown(t *testing.T) {
 		t.Fatal("Stop() did not return within 5 seconds")
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerResetStuckMessages(t *testing.T) {
@@ -376,7 +376,7 @@ func TestWorkerResetStuckMessages(t *testing.T) {
 		t.Errorf("unexpected to: %s", sent[0].to)
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerNoMessagesNoError(t *testing.T) {
@@ -392,7 +392,7 @@ func TestWorkerNoMessagesNoError(t *testing.T) {
 
 	cancel()
 	w.Stop()
-	st.Close()
+	_ = st.Close()
 
 	if len(ms.getSent()) != 0 {
 		t.Errorf("expected 0 sent messages, got %d", len(ms.getSent()))
@@ -429,7 +429,7 @@ func TestWorkerMultipleWorkers(t *testing.T) {
 		t.Fatalf("expected 10 sent messages, got %d", len(ms.getSent()))
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerCancelDuringProcessing(t *testing.T) {
@@ -473,7 +473,7 @@ func TestWorkerCancelDuringProcessing(t *testing.T) {
 		t.Fatal("worker did not stop within 10 seconds")
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 func TestWorkerClaimErrorContinues(t *testing.T) {
@@ -487,7 +487,7 @@ func TestWorkerClaimErrorContinues(t *testing.T) {
 	w.Start(ctx)
 
 	// Close the store to force ClaimPendingMessages to fail.
-	st.Close()
+	_ = st.Close()
 
 	// Let a dispatch cycle fail.
 	time.Sleep(3 * time.Second)
@@ -611,7 +611,7 @@ func TestWorkerResetStuckMessagesError(t *testing.T) {
 	w := NewWorker(st, mockChannelSender(ms),1, 10*time.Millisecond)
 
 	// Close the store so ResetStuckMessages will fail.
-	st.Close()
+	_ = st.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	w.Start(ctx) // Should log warning but not panic.
@@ -700,7 +700,7 @@ func TestWorkerDispatchCancelDuringChannelSend(t *testing.T) {
 		t.Fatal("Stop() did not return within 10 seconds")
 	}
 
-	st.Close()
+	_ = st.Close()
 }
 
 // failThenCloseSender returns an error from Send and closes the store,
@@ -718,6 +718,6 @@ func (f *failThenCloseSender) Send(_, _, _, _ string) error {
 	f.mu.Lock()
 	f.called = true
 	f.mu.Unlock()
-	f.store.Close()
+	_ = f.store.Close()
 	return f.sendErr
 }
