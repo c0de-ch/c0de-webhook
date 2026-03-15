@@ -128,9 +128,9 @@ func buildSenders(st *store.Store, cfg *config.Config) queue.ChannelSender {
 
 	// WhatsApp Business API
 	var waSender *whatsapp.BusinessSender
-	waPhoneID, _ := settings["whatsapp_phone_id"]
-	waToken, _ := settings["whatsapp_access_token"]
-	waVersion, _ := settings["whatsapp_api_version"]
+	waPhoneID := settings["whatsapp_phone_id"]
+	waToken := settings["whatsapp_access_token"]
+	waVersion := settings["whatsapp_api_version"]
 	if waPhoneID != "" && waToken != "" {
 		waSender = whatsapp.NewBusinessSender(waPhoneID, waToken, waVersion)
 		log.Printf("WhatsApp Business API configured (phone_id=%s)", waPhoneID)
@@ -138,8 +138,8 @@ func buildSenders(st *store.Store, cfg *config.Config) queue.ChannelSender {
 
 	// Telegram Bot API
 	var tgSender *telegram.Sender
-	tgToken, _ := settings["telegram_bot_token"]
-	tgParseMode, _ := settings["telegram_parse_mode"]
+	tgToken := settings["telegram_bot_token"]
+	tgParseMode := settings["telegram_parse_mode"]
 	if tgToken != "" {
 		tgSender = telegram.NewSender(tgToken, tgParseMode)
 		log.Printf("Telegram Bot API configured")
