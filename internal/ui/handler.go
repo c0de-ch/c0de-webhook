@@ -562,7 +562,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleSaveChannels(w http.ResponseWriter, r *http.Request) {
 	keys := []string{
 		"smtp_host", "smtp_port", "smtp_username", "smtp_password", "smtp_from",
-		"smtp_tls", "smtp_auth_method",
+		"smtp_tls", "smtp_tls_skip_verify", "smtp_auth_method",
 		"whatsapp_phone_id", "whatsapp_access_token", "whatsapp_api_version",
 		"telegram_bot_token", "telegram_parse_mode",
 	}

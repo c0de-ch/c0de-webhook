@@ -72,7 +72,10 @@ func (s *SMTPSender) Send(to, subject, textBody, htmlBody string) error {
 
 func (s *SMTPSender) connect() (*smtp.Client, error) {
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
-	tlsConfig := &tls.Config{ServerName: s.cfg.Host}
+	tlsConfig := &tls.Config{
+		ServerName:         s.cfg.Host,
+		InsecureSkipVerify: s.cfg.TLSSkipVerify,
+	}
 
 	switch s.cfg.Port {
 	case 465:

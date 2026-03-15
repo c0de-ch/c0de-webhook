@@ -29,8 +29,9 @@ type SMTPConfig struct {
 	Username   string `yaml:"username"`
 	Password   string `yaml:"password"`
 	From       string `yaml:"from"`
-	TLS        bool   `yaml:"tls"`
-	AuthMethod string `yaml:"auth_method"` // plain, login, crammd5, none
+	TLS            bool   `yaml:"tls"`
+	TLSSkipVerify  bool   `yaml:"tls_skip_verify"`
+	AuthMethod     string `yaml:"auth_method"` // plain, login, crammd5, none
 }
 
 type QueueConfig struct {

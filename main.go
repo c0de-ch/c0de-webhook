@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -125,8 +126,28 @@ func buildSenders(st *store.Store, cfg *config.Config) queue.ChannelSender {
 	if v, ok := settings["smtp_host"]; ok && v != "" {
 		smtpCfg.Host = v
 	}
+	if v, ok := settings["smtp_port"]; ok && v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			smtpCfg.Port = p
+		}
+	}
+	if v, ok := settings["smtp_username"]; ok && v != "" {
+		smtpCfg.Username = v
+	}
+	if v, ok := settings["smtp_password"]; ok && v != "" {
+		smtpCfg.Password = v
+	}
 	if v, ok := settings["smtp_from"]; ok && v != "" {
 		smtpCfg.From = v
+	}
+	if v, ok := settings["smtp_tls"]; ok {
+		smtpCfg.TLS = v == "true"
+	}
+	if v, ok := settings["smtp_tls_skip_verify"]; ok {
+		smtpCfg.TLSSkipVerify = v == "true"
+	}
+	if v, ok := settings["smtp_auth_method"]; ok && v != "" {
+		smtpCfg.AuthMethod = v
 	}
 
 	// WhatsApp Business API

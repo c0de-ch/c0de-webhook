@@ -68,6 +68,13 @@
             </select>
         </div>
         <div class="form-group">
+            <label class="form-label">Skip TLS Verify</label>
+            <select name="smtp_tls_skip_verify" class="form-input">
+                <option value="false" {{if eq (settingVal $s "smtp_tls_skip_verify" "") "true"}}{{else}}selected{{end}}>No (verify certificate)</option>
+                <option value="true" {{if eq (settingVal $s "smtp_tls_skip_verify" "") "true"}}selected{{end}}>Yes (accept expired/self-signed certs)</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label class="form-label">Auth Method</label>
             <select name="smtp_auth_method" class="form-input">
                 {{$authMethod := settingVal $s "smtp_auth_method" $c.SMTP.AuthMethod}}
