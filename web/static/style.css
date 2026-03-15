@@ -624,3 +624,27 @@ code, pre { font-family: var(--font-mono); }
 .cell-mono { font-family: var(--font-mono); font-size: 0.85rem; }
 .cell-muted { color: var(--fg-muted); }
 .cell-tabular { font-variant-numeric: tabular-nums; }
+
+/* Expandable error text */
+.cell-error { max-width: 300px; }
+.error-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.85rem;
+  color: var(--red);
+  cursor: pointer;
+  word-break: break-word;
+}
+.error-text:hover { text-decoration: underline; }
+.error-text.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  background: var(--red-bg);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid #e8b4ac;
+  margin: -2px -4px;
+}

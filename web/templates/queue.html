@@ -36,7 +36,7 @@
                     <td style="font-size: 0.82rem;">{{.Channel}}</td>
                     <td><span class="status-badge {{statusClass .Status}}">{{.Status}}</span></td>
                     <td style="text-align: center;">{{.Attempts}}</td>
-                    <td title="{{.LastError}}" class="cell-muted" style="font-size: 0.85rem;">{{truncate .LastError 40}}</td>
+                    <td class="cell-muted cell-error" title="{{.LastError}}">{{if .LastError}}<span class="error-text" onclick="this.classList.toggle('expanded')">{{.LastError}}</span>{{end}}</td>
                     <td class="cell-muted cell-tabular">{{formatTime .CreatedAt}}</td>
                     <td class="actions-cell">
                         {{if eq .Status "failed"}}
