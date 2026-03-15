@@ -47,7 +47,14 @@ func (s *SMTPSender) Send(to, subject, textBody, htmlBody string) error {
 		}
 	}
 
-	if err := client.Mail(s.cfg.From); err != nil {
+	// Use SMTP username as envelope sender if set (required by some servers
+	// like Plesk that reject MAIL FROM != authenticated user). The From header
+	// in the message body still uses the configured From address.
+	envelopeFrom := s.cfg.From
+	if s.cfg.Username != "" {
+		envelopeFrom = s.cfg.Username
+	}
+	if err := client.Mail(envelopeFrom); err != nil {
 		return fmt.Errorf("MAIL FROM: %w", err)
 	}
 	for _, rcpt := range recipients {
