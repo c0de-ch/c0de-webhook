@@ -77,7 +77,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to setup web filesystem: %v", err)
 	}
-	uiHandler := ui.NewHandler(st, a, cfg, webFS)
+	reloadSenders := func() {
+		w.UpdateSenders(buildSenders(st, cfg))
+	}
+	uiHandler := ui.NewHandler(st, a, cfg, webFS, reloadSenders)
 	uiHandler.RegisterRoutes(mux)
 
 	webhookHandler := webhook.NewHandler(st, a, cfg.Queue.MaxRetries)

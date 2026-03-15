@@ -24,10 +24,19 @@ type ChannelSender struct {
 type Worker struct {
 	store      *store.Store
 	senders    ChannelSender
+	sendersMu  sync.RWMutex
 	workers    int
 	retryDelay time.Duration
 	ch         chan store.Message
 	wg         sync.WaitGroup
+}
+
+// UpdateSenders hot-swaps the channel senders without restarting the worker.
+func (w *Worker) UpdateSenders(s ChannelSender) {
+	w.sendersMu.Lock()
+	w.senders = s
+	w.sendersMu.Unlock()
+	log.Println("Channel senders reloaded")
 }
 
 func NewWorker(st *store.Store, senders ChannelSender, workers int, retryDelay time.Duration) *Worker {
@@ -117,22 +126,26 @@ func (w *Worker) process(ctx context.Context, id int) {
 }
 
 func (w *Worker) sendByChannel(msg store.Message) error {
+	w.sendersMu.RLock()
+	senders := w.senders
+	w.sendersMu.RUnlock()
+
 	switch msg.Channel {
 	case "whatsapp":
-		if w.senders.WhatsApp == nil || !w.senders.WhatsApp.Configured() {
+		if senders.WhatsApp == nil || !senders.WhatsApp.Configured() {
 			return fmt.Errorf("whatsapp sender not configured")
 		}
-		return w.senders.WhatsApp.Send(msg.To, msg.TextBody)
+		return senders.WhatsApp.Send(msg.To, msg.TextBody)
 	case "telegram":
-		if w.senders.Telegram == nil || !w.senders.Telegram.Configured() {
+		if senders.Telegram == nil || !senders.Telegram.Configured() {
 			return fmt.Errorf("telegram sender not configured")
 		}
-		return w.senders.Telegram.Send(msg.To, msg.TextBody)
+		return senders.Telegram.Send(msg.To, msg.TextBody)
 	case "mail", "":
-		if w.senders.Mail == nil {
+		if senders.Mail == nil {
 			return fmt.Errorf("mail sender not configured")
 		}
-		return w.senders.Mail.Send(msg.To, msg.Subject, msg.TextBody, msg.HTMLBody)
+		return senders.Mail.Send(msg.To, msg.Subject, msg.TextBody, msg.HTMLBody)
 	default:
 		return fmt.Errorf("unknown channel: %s", msg.Channel)
 	}

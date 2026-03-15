@@ -16,14 +16,19 @@ import (
 	"c0de-webhook/internal/store"
 )
 
+// OnSettingsSaved is called after channel settings are saved in the UI.
+// Use this to rebuild senders without restarting.
+type OnSettingsSaved func()
+
 type Handler struct {
-	store         *store.Store
-	auth          *auth.Auth
-	config        *config.Config
-	webFS         fs.FS
-	templates     map[string]*template.Template
-	pendingTokens map[string]string // sessionID -> raw token
-	mu            sync.Mutex
+	store            *store.Store
+	auth             *auth.Auth
+	config           *config.Config
+	webFS            fs.FS
+	templates        map[string]*template.Template
+	pendingTokens    map[string]string // sessionID -> raw token
+	mu               sync.Mutex
+	onSettingsSaved  OnSettingsSaved
 }
 
 type PageData struct {
@@ -72,11 +77,16 @@ type SettingsContent struct {
 	SettingsErr  bool
 }
 
-func NewHandler(st *store.Store, a *auth.Auth, cfg *config.Config, webFS fs.FS) *Handler {
+func NewHandler(st *store.Store, a *auth.Auth, cfg *config.Config, webFS fs.FS, onSaved ...OnSettingsSaved) *Handler {
+	var cb OnSettingsSaved
+	if len(onSaved) > 0 {
+		cb = onSaved[0]
+	}
 	h := &Handler{
-		store:         st,
-		auth:          a,
-		config:        cfg,
+		store:           st,
+		auth:            a,
+		config:          cfg,
+		onSettingsSaved: cb,
 		webFS:         webFS,
 		pendingTokens: make(map[string]string),
 	}
@@ -564,5 +574,8 @@ func (h *Handler) handleSaveChannels(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.Redirect(w, r, "/settings?ch_msg=Channel+settings+saved.+Restart+server+to+apply.", http.StatusSeeOther)
+	if h.onSettingsSaved != nil {
+		h.onSettingsSaved()
+	}
+	http.Redirect(w, r, "/settings?ch_msg=Channel+settings+saved+and+applied.", http.StatusSeeOther)
 }
